@@ -1,8 +1,8 @@
 """
-Eastern US Flight Data Extractor
+Georgia Flight Data Extractor
 -------------------------------
 Extracts and processes flight data from OpenSky Network's state_vectors_data4 table
-for the Eastern United States region.
+for the Georgia region.
 """
 
 from pyopensky.trino import Trino
@@ -22,11 +22,18 @@ EAST_US_BOUNDS = {
     'east': -66.90     # Eastern Maine
 }
 
-def get_east_us_data(start_time: datetime, 
+GEORGIA_BOUNDS = {
+    'north': 35.00, # max latitude
+    'south': 30.63, # min latitude
+    'west': -85.13, # min longitude
+    'east': -80.85 # max longitude
+}
+
+def get_georgia_data(start_time: datetime, 
                      duration_hours: int = 1,
                      cached: bool = True) -> pd.DataFrame:
     """
-    Retrieve state vectors data for Eastern US airspace.
+    Retrieve state vectors data for Georgia airspace.
     
     Args:
         start_time: Start time for the query (UTC)
@@ -40,10 +47,10 @@ def get_east_us_data(start_time: datetime,
     trino = Trino()
     
     bounds = (
-        EAST_US_BOUNDS['west'],
-        EAST_US_BOUNDS['south'],
-        EAST_US_BOUNDS['east'],
-        EAST_US_BOUNDS['north']
+        GEORGIA_BOUNDS['west'],
+        GEORGIA_BOUNDS['south'],
+        GEORGIA_BOUNDS['east'],
+        GEORGIA_BOUNDS['north']
     )
     
     try:
@@ -51,17 +58,16 @@ def get_east_us_data(start_time: datetime,
             start=start_time,
             stop=start_time + timedelta(hours=duration_hours),
             bounds=bounds,
-            # Updated column names to match schema
             selected_columns=(
                 "time",
                 "icao24",
                 "callsign",
-                "lat",           # Changed from latitude
-                "lon",           # Changed from longitude
-                "geoaltitude",   # Changed from altitude
+                "lat",
+                "lon",
+                "geoaltitude",
                 "velocity",
                 "heading",
-                "vertrate",      # Changed from vertical_rate
+                "vertrate",
                 "onground"
             ),
             cached=cached,
@@ -69,15 +75,14 @@ def get_east_us_data(start_time: datetime,
         )
         
         if df is not None:
-            # Updated column names in the query
             df = df.query(
-                "lat >= @EAST_US_BOUNDS['south'] and "  # Changed from latitude
-                "lat <= @EAST_US_BOUNDS['north'] and "  # Changed from latitude
-                "lon >= @EAST_US_BOUNDS['west'] and "   # Changed from longitude
-                "lon <= @EAST_US_BOUNDS['east']"        # Changed from longitude
+                "lat >= @GEORGIA_BOUNDS['south'] and "  # Changed from latitude
+                "lat <= @GEORGIA_BOUNDS['north'] and "  # Changed from latitude
+                "lon >= @GEORGIA_BOUNDS['west'] and "   # Changed from longitude
+                "lon <= @GEORGIA_BOUNDS['east']"        # Changed from longitude
             )
             
-            # Optionally rename columns for clarity
+            # rename columns for clarity
             df = df.rename(columns={
                 'lat': 'latitude',
                 'lon': 'longitude',
@@ -110,14 +115,14 @@ def process_large_timeframe(start_time: datetime,
         chunk_start = start_time + timedelta(hours=hour)
         logger.info(f"Processing chunk starting at {chunk_start}")
         
-        df = get_east_us_data(
+        df = get_georgia_data(
             start_time=chunk_start,
             duration_hours=chunk_hours
         )
         
         if not df.empty:
             # Save each chunk to avoid memory issues
-            chunk_file = f"east_us_data_{chunk_start.strftime('%Y%m%d_%H')}.parquet"
+            chunk_file = f"data/georgia_data_{chunk_start.strftime('%Y%m%d_%H')}.parquet"
             df.to_parquet(chunk_file)
             logger.info(f"Saved chunk to {chunk_file}")
             
@@ -126,7 +131,7 @@ def process_large_timeframe(start_time: datetime,
     if all_data:
         # Combine all chunks
         final_df = pd.concat(all_data, ignore_index=True)
-        final_df.to_parquet("east_us_complete_dataset.parquet")
+        final_df.to_parquet("data/georgia_complete_dataset.parquet")
         logger.info("Saved complete dataset")
         return final_df
     
@@ -135,12 +140,12 @@ def process_large_timeframe(start_time: datetime,
 if __name__ == "__main__":
     # Example usage
     now = datetime.utcnow()
-    start_time = now - timedelta(hours=24)  # Get last 24 hours
+    start_time = now - timedelta(hours=12)  # Get last 12 hours
     
     # Process data in 1-hour chunks
     df = process_large_timeframe(
         start_time=start_time,
-        total_hours=24,
+        total_hours=12,
         chunk_hours=1
     )
     
