@@ -126,7 +126,7 @@ def calculate_flight_metrics(flight_data: pd.DataFrame) -> pd.DataFrame:
 if __name__ == "__main__":
     # Example usage
     now = datetime.utcnow()
-    start_time = now - timedelta(hours=12)
+    start_time = now - timedelta(hours=24)
 
     # Get raw flight data
     raw_data = get_georgia_data(start_time=start_time, duration_hours=12)
