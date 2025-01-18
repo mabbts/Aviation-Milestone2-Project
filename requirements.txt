@@ -1,2 +1,3 @@
 pyOpenSky
 requests
+haversine
