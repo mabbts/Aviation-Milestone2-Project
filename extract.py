@@ -22,7 +22,16 @@ EAST_US_BOUNDS = {
     'east': -66.90     # Eastern Maine
 }
 
-GEORGIA_BOUNDS = {
+#Georgia State bounds:
+
+#- North point: 35.003114, -83.877596
+#- West point: 32.454282, -85.127623
+#- South point: 30.632715, -83.163816
+#- East point: 32.022410, -80.847618
+
+### Subsample timeframes -> every 5/10 minutes
+
+GEORGIA_BOUNDS = { # this is how pyopensky wants the bounds - as a tuple 
     'north': 35.00, # max latitude
     'south': 30.63, # min latitude
     'west': -85.13, # min longitude
