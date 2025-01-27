@@ -1,3 +1,7 @@
 venv/
 
 data/
+
+flight_samples/
+
+test.py
