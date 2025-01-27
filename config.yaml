@@ -1,0 +1,38 @@
+# Geographic regions configuration
+regions:
+  georgia:
+    north: 35.00
+    south: 30.63
+    west: -85.13
+    east: -80.85
+    description: "State of Georgia, USA"
+
+  north_carolina:
+    north: 36.58
+    south: 33.80
+    west: -84.32
+    east: -75.45
+    description: "State of North Carolina, USA"
+
+  virginia:
+    north: 39.46
+    south: 36.54
+    west: -83.68
+    east: -75.24
+    description: "Commonwealth of Virginia, USA"
+
+  europe:
+    north: 60.00
+    south: 35.00
+    west: -10.00
+    east: 30.00
+    description: "European airspace"
+
+  asia_pac:
+    north: 45.00
+    south: -10.00
+    west: 80.00
+    east: 160.00
+
+# Default region to use if none specified
+default_region: georgia
