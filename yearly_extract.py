@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import os
 import logging
+import random
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -14,73 +15,90 @@ def ensure_data_dir(base_dir='data'):
         os.makedirs(base_dir)
     return base_dir
 
-def process_month(year: int, month: int, airport: str = 'KATL', data_dir: str = 'data'):
+def get_random_dates(start_date: datetime, end_date: datetime, n_samples: int = 100) -> list:
     """
-    Process and save data for a single month
+    Generate random dates between start_date and end_date
     
     Args:
-        year: Year to process
-        month: Month to process (1-12)
+        start_date: Start date
+        end_date: End date
+        n_samples: Number of random dates to generate
+        
+    Returns:
+        List of random datetime objects
+    """
+    date_range = (end_date - start_date).days
+    random_dates = []
+    
+    for _ in range(n_samples):
+        # Generate random number of days to add
+        days_to_add = random.randint(0, date_range)
+        # Generate random hour (0-23)
+        random_hour = random.randint(0, 23)
+        
+        # Create random datetime
+        random_date = start_date + timedelta(days=days_to_add)
+        random_date = random_date.replace(hour=random_hour, minute=0, second=0)
+        random_dates.append(random_date)
+    
+    # Sort dates for better organization
+    return sorted(random_dates)
+
+def process_sample(sample_time: datetime, airport: str = 'KATL', data_dir: str = 'data', sample_duration: int = 1):
+    """
+    Process and save data for a single time sample
+    
+    Args:
+        sample_time: Start time for the sample
         airport: Airport ICAO code
         data_dir: Directory to save data
+        sample_duration: Duration in hours to sample
     """
-    # Calculate start and end dates
-    start_date = datetime(year, month, 1)
-    if month == 12:
-        end_date = datetime(year + 1, 1, 1)
-    else:
-        end_date = datetime(year, month + 1, 1)
+    # Calculate end time
+    end_time = sample_time + timedelta(hours=sample_duration)
+    time_key = sample_time.strftime('%Y%m%d_%H%M')
     
-    month_key = start_date.strftime('%Y-%m')
-    logger.info(f"Processing {month_key}...")
+    logger.info(f"Processing sample for {time_key}...")
     
     # Initialize loader and get data
     loader = OpenSkyLoader(request_delay=2.0)
     try:
-        data = loader.get_flights_with_vectors(
-            start_time=start_date,
-            end_time=end_date,
+        data = loader.get_flight_data(
+            start_time=sample_time,
+            end_time=end_time,
             airport=airport,
             region='georgia'
         )
         
-        if data['flights'].empty:
-            logger.warning(f"No data found for {month_key}")
+        if data.empty:
+            logger.warning(f"No data found for {time_key}")
             return
         
         # Save the data
-        flights_file = os.path.join(data_dir, f'flights_{month_key}.csv')
-        vectors_file = os.path.join(data_dir, f'state_vectors_{month_key}.csv')
+        output_file = os.path.join(data_dir, f'flight_data_{time_key}.csv')
+        data.to_csv(output_file, index=False)
         
-        data['flights'].to_csv(flights_file, index=False)
-        data['state_vectors'].to_csv(vectors_file, index=False)
-        
-        logger.info(f"Saved {len(data['flights'])} flights and "
-                   f"{len(data['state_vectors'])} vectors for {month_key}")
+        logger.info(f"Saved {len(data)} records for {time_key}")
         
     except Exception as e:
-        logger.error(f"Error processing {month_key}: {str(e)}")
+        logger.error(f"Error processing {time_key}: {str(e)}")
 
 if __name__ == "__main__":
     # Ensure data directory exists
     data_dir = ensure_data_dir()
     
-    # Process the last 12 months
+    # Set date range for the past year
     end_date = datetime.now()
-    current_date = end_date - timedelta(days=30)
+    start_date = end_date - timedelta(days=365)
     
-    # Round to start of current month
-    current_date = current_date.replace(day=1, hour=0, minute=0, second=0)
+    # Generate random dates
+    random_dates = get_random_dates(start_date, end_date, n_samples=100)
     
-    logger.info(f"Processing data from {current_date.date()} to {end_date.date()}")
+    logger.info(f"Processing {len(random_dates)} random samples from "
+               f"{start_date.date()} to {end_date.date()}")
     
-    while current_date < end_date:
-        process_month(current_date.year, current_date.month, data_dir=data_dir)
+    # Process each random date
+    for sample_time in random_dates:
+        process_sample(sample_time, data_dir=data_dir)
         
-        # Move to next month
-        if current_date.month == 12:
-            current_date = current_date.replace(year=current_date.year + 1, month=1)
-        else:
-            current_date = current_date.replace(month=current_date.month + 1)
-    
     logger.info("Processing complete!")
