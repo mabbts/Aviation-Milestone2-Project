@@ -188,10 +188,11 @@ class OpenSkyLoader:
         n_samples: int = 10,
         airport: Optional[str] = None,
         include_vectors: bool = True,
-        vector_time_buffer: Optional[int] = 300  # 5 minutes buffer in seconds
+        vector_time_buffer: Optional[int] = 300,  # 5 minutes buffer in seconds
+        batch_size: int = 50  # Maximum number of flights to query vectors for at once
     ) -> Dict[str, pd.DataFrame]:
         """
-        Sample flights and optionally get their corresponding state vectors
+        Sample flights and get their corresponding state vectors efficiently using batching
         
         Args:
             start_time: Start time for query
@@ -200,6 +201,7 @@ class OpenSkyLoader:
             airport: Filter by either departure or arrival airport
             include_vectors: Whether to include state vectors
             vector_time_buffer: Time buffer in seconds to look for state vectors before/after flight times
+            batch_size: Maximum number of flights to process in a single vector query
             
         Returns:
             Dictionary containing 'flights' DataFrame and optionally 'state_vectors' DataFrame
@@ -213,44 +215,79 @@ class OpenSkyLoader:
         
         if flights.empty:
             logger.warning("No flights found for the given criteria")
-            return {'flights': pd.DataFrame()}
+            return {'flights': pd.DataFrame(), 'state_vectors': pd.DataFrame()}
             
         # Sample flights
         sampled_flights = flights.sample(n=min(n_samples, len(flights)))
-        
         result = {'flights': sampled_flights}
         
-        # Get corresponding state vectors if requested
         if include_vectors:
-            all_vectors = []
+            all_vector_dfs = []
             
-            for _, flight in sampled_flights.iterrows():
-                # Get flight times
-                firstseen = flight.get('firstseen')
-                lastseen = flight.get('lastseen')
+            # Process flights in batches
+            for batch_start in range(0, len(sampled_flights), batch_size):
+                batch_end = min(batch_start + batch_size, len(sampled_flights))
+                flight_batch = sampled_flights.iloc[batch_start:batch_end]
                 
-                if firstseen and lastseen:
-                    # Add buffer to search window
-                    vector_start = firstseen - pd.Timedelta(seconds=vector_time_buffer)
-                    vector_end = lastseen + pd.Timedelta(seconds=vector_time_buffer)
+                # Get all unique identifiers from batch
+                icao24_list = flight_batch['icao24'].dropna().unique().tolist()
+                callsign_list = (flight_batch['callsign']
+                               .dropna()
+                               .str.strip()
+                               .replace('', pd.NA)
+                               .dropna()
+                               .unique()
+                               .tolist())
+                
+                # Determine batch time window with buffer
+                buffer_td = pd.Timedelta(seconds=vector_time_buffer)
+                min_firstseen = flight_batch['firstseen'].min() - buffer_td
+                max_lastseen = flight_batch['lastseen'].max() + buffer_td
+                
+                # Query vectors for the entire batch
+                batch_vectors = self.load_state_vectors(
+                    start_time=min_firstseen,
+                    end_time=max_lastseen,
+                    icao24=icao24_list if icao24_list else None,
+                    callsign=callsign_list if callsign_list else None
+                )
+                
+                if not batch_vectors.empty:
+                    # Convert to datetime for comparison if needed
+                    if not pd.api.types.is_datetime64_any_dtype(batch_vectors['time']):
+                        batch_vectors['time'] = pd.to_datetime(batch_vectors['time'], utc=True)
                     
-                    # Get state vectors for this flight
-                    vectors = self.load_state_vectors(
-                        start_time=vector_start,
-                        end_time=vector_end,
-                        icao24=flight.get('icao24'),
-                        callsign=flight.get('callsign')
-                    )
-                    
-                    if not vectors.empty:
-                        # Add flight identifier columns
-                        vectors['flight_id'] = flight.get('flight_id', '')
-                        vectors['firstseen'] = firstseen
-                        vectors['lastseen'] = lastseen
-                        all_vectors.append(vectors)
+                    # Process each flight in the batch
+                    for _, flight in flight_batch.iterrows():
+                        # Calculate time window for this flight
+                        flight_start = flight['firstseen'] - buffer_td
+                        flight_end = flight['lastseen'] + buffer_td
+                        
+                        # Filter vectors for this flight
+                        mask = (
+                            (batch_vectors['time'] >= flight_start) &
+                            (batch_vectors['time'] <= flight_end) &
+                            (batch_vectors['icao24'] == flight['icao24'])
+                        )
+                        
+                        # Optional callsign filter if available
+                        if pd.notna(flight['callsign']):
+                            mask &= (batch_vectors['callsign'] == flight['callsign'].strip())
+                        
+                        flight_vectors = batch_vectors[mask].copy()
+                        if not flight_vectors.empty:
+                            # Add flight identifier columns
+                            flight_vectors['flight_id'] = flight.get('flight_id', '')
+                            flight_vectors['firstseen'] = flight['firstseen']
+                            flight_vectors['lastseen'] = flight['lastseen']
+                            all_vector_dfs.append(flight_vectors)
+                
+                logger.info(f"Processed batch {batch_start//batch_size + 1} "
+                          f"({batch_start}-{batch_end} of {len(sampled_flights)} flights)")
             
-            if all_vectors:
-                result['state_vectors'] = pd.concat(all_vectors, ignore_index=True)
+            # Combine all vector DataFrames
+            if all_vector_dfs:
+                result['state_vectors'] = pd.concat(all_vector_dfs, ignore_index=True)
             else:
                 result['state_vectors'] = pd.DataFrame()
                 logger.warning("No state vectors found for the sampled flights")

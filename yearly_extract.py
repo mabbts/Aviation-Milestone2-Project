@@ -66,7 +66,7 @@ data_dir = ensure_data_dir()
 
 # Collect the samples
 print(f"Collecting flight samples from {start_date.date()} to {end_date.date()}")
-monthly_samples = get_monthly_samples(start_date, end_date, samples_per_month=1000)
+monthly_samples = get_monthly_samples(start_date, end_date, samples_per_month=100)
 
 # Save and print summary of collected data
 for month, data in monthly_samples.items():
