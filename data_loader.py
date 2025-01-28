@@ -187,37 +187,54 @@ class OpenSkyLoader:
             time_value = time_value.replace(tzinfo=timezone.utc)
         return time_value
 
-    def sample_flights_with_vectors(
+    def get_flights_with_vectors(
         self,
         start_time: Union[datetime, str],
         end_time: Optional[Union[datetime, str]] = None,
-        n_samples: int = 10,
         airport: Optional[str] = None,
-        include_vectors: bool = True,
+        bounds: Optional[Dict[str, float]] = None,
+        region: Optional[str] = None,
         vector_time_buffer: Optional[int] = 300,  # 5 minutes buffer in seconds
     ) -> Dict[str, pd.DataFrame]:
         """
-        Sample flights and get their corresponding state vectors efficiently by querying vectors first
+        Get all flights and their corresponding state vectors efficiently by querying vectors first
         
         Args:
             start_time: Start time for query
             end_time: End time for query (optional)
-            n_samples: Number of flights to sample
             airport: Filter by either departure or arrival airport
-            include_vectors: Whether to include state vectors
+            bounds: Manual bounds as dict with north/south/east/west
+            region: Named region from config to use for bounds
             vector_time_buffer: Time buffer in seconds to look for state vectors before/after flight times
             
         Returns:
-            Dictionary containing 'flights' DataFrame and optionally 'state_vectors' DataFrame
+            Dictionary containing 'flights' DataFrame and 'state_vectors' DataFrame
         """
         # First get all state vectors for the time period
+        logger.info("Fetching state vectors...")
+        
+        # Determine bounds for the query
+        query_bounds = None
+        if bounds:
+            query_bounds = bounds
+        elif region:
+            query_bounds = self._get_region_bounds(region)
+        elif self.default_bounds:
+            query_bounds = self.default_bounds
+        
+        if query_bounds:
+            logger.info(f"Using geographic bounds: N={query_bounds['north']}, S={query_bounds['south']}, "
+                       f"E={query_bounds['east']}, W={query_bounds['west']}")
+        
         all_vectors = self.load_state_vectors(
             start_time=start_time,
-            end_time=end_time
+            end_time=end_time,
+            bounds=query_bounds,
+            region=region if not bounds else None  # Use region only if no manual bounds
         )
         
         if all_vectors.empty:
-            logger.warning("No state vectors found for the given time period")
+            logger.warning("No state vectors found for the given time period and bounds")
             return {'flights': pd.DataFrame(), 'state_vectors': pd.DataFrame()}
         
         # Extract unique identifiers from vectors
@@ -231,6 +248,7 @@ class OpenSkyLoader:
                            .tolist())
         
         # Get all matching flights in one query
+        logger.info(f"Fetching matching flights for {len(unique_icao24s)} unique aircraft...")
         all_flights = self.load_flights(
             start_time=start_time,
             end_time=end_time,
@@ -242,44 +260,40 @@ class OpenSkyLoader:
             logger.warning("No flights found matching the state vector aircraft")
             return {'flights': pd.DataFrame(), 'state_vectors': pd.DataFrame()}
         
-        # Sample flights
-        sampled_flights = all_flights.sample(n=min(n_samples, len(all_flights)))
-        result = {'flights': sampled_flights}
+        # Match vectors with flights
+        logger.info("Matching vectors with flights...")
+        merged_vectors = []
+        buffer_td = pd.Timedelta(seconds=vector_time_buffer)
         
-        if include_vectors:
-            # Filter vectors to match sampled flights
-            merged_vectors = []
-            buffer_td = pd.Timedelta(seconds=vector_time_buffer)
+        for _, flight in all_flights.iterrows():
+            flight_start = flight['firstseen'] - buffer_td
+            flight_end = flight['lastseen'] + buffer_td
             
-            for _, flight in sampled_flights.iterrows():
-                flight_start = flight['firstseen'] - buffer_td
-                flight_end = flight['lastseen'] + buffer_td
-                
-                # Create mask for this flight's vectors
-                mask = (
-                    (all_vectors['time'] >= flight_start) &
-                    (all_vectors['time'] <= flight_end) &
-                    (all_vectors['icao24'] == flight['icao24'])
-                )
-                
-                # Add callsign filter if available
-                if pd.notna(flight['callsign']):
-                    mask &= (all_vectors['callsign'] == flight['callsign'].strip())
-                
-                flight_vectors = all_vectors[mask].copy()
-                if not flight_vectors.empty:
-                    flight_vectors['flight_id'] = flight.get('flight_id', '')
-                    flight_vectors['firstseen'] = flight['firstseen']
-                    flight_vectors['lastseen'] = flight['lastseen']
-                    merged_vectors.append(flight_vectors)
+            # Create mask for this flight's vectors
+            mask = (
+                (all_vectors['time'] >= flight_start) &
+                (all_vectors['time'] <= flight_end) &
+                (all_vectors['icao24'] == flight['icao24'])
+            )
             
-            if merged_vectors:
-                result['state_vectors'] = pd.concat(merged_vectors, ignore_index=True)
-            else:
-                result['state_vectors'] = pd.DataFrame()
-                logger.warning("No state vectors found for the sampled flights")
+            # Add callsign filter if available
+            if pd.notna(flight['callsign']):
+                mask &= (all_vectors['callsign'] == flight['callsign'].strip())
+            
+            flight_vectors = all_vectors[mask].copy()
+            if not flight_vectors.empty:
+                flight_vectors['flight_id'] = flight.get('flight_id', '')
+                flight_vectors['firstseen'] = flight['firstseen']
+                flight_vectors['lastseen'] = flight['lastseen']
+                merged_vectors.append(flight_vectors)
         
-        return result
+        final_vectors = pd.concat(merged_vectors, ignore_index=True) if merged_vectors else pd.DataFrame()
+        
+        logger.info(f"Found {len(all_flights)} flights and {len(final_vectors)} state vectors")
+        return {
+            'flights': all_flights,
+            'state_vectors': final_vectors
+        }
 
 # Usage Example
 if __name__ == "__main__":
@@ -287,11 +301,11 @@ if __name__ == "__main__":
     try:
         # Sample flights with their state vectors
         print("\nSampling flights with state vectors...")
-        sampled_data = loader.sample_flights_with_vectors(
+        sampled_data = loader.get_flights_with_vectors(
             start_time='2024-03-01 08:00:00',
             end_time='2024-03-01 09:00:00',
-            n_samples=5,
             airport='KATL',  # Atlanta International
+            region='georgia'
         )
         
         if not sampled_data['flights'].empty:

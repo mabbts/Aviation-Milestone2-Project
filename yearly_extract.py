@@ -2,53 +2,11 @@ from data_loader import OpenSkyLoader
 from datetime import datetime, timedelta
 import pandas as pd
 import os
+import logging
 
-def get_monthly_samples(start_date, end_date, airport='KATL', samples_per_month=5):
-    """
-    Get flight samples for each month between start_date and end_date
-    
-    Args:
-        start_date: Starting date for data collection
-        end_date: Ending date for data collection
-        airport: Airport ICAO code
-        samples_per_month: Number of samples to collect per month
-        
-    Returns:
-        Dictionary containing all flight and vector data, organized by month
-    """
-    loader = OpenSkyLoader(request_delay=2.0)
-    monthly_data = {}
-    
-    current_date = start_date
-    while current_date < end_date:
-        # Calculate the start and end of the current month
-        month_start = current_date.replace(day=1, hour=0, minute=0, second=0)
-        if current_date.month == 12:
-            month_end = current_date.replace(year=current_date.year + 1, month=1, day=1)
-        else:
-            month_end = current_date.replace(month=current_date.month + 1, day=1)
-        
-        try:
-            month_key = current_date.strftime('%Y-%m')
-            print(f"Collecting data for {month_key}...")
-            
-            monthly_data[month_key] = loader.sample_flights_with_vectors(
-                start_time=month_start,
-                end_time=month_end,
-                n_samples=samples_per_month,
-                airport=airport,
-                vector_time_buffer=300
-            )
-            
-            print(f"Successfully collected {len(monthly_data[month_key]['flights'])} flights for {month_key}")
-            
-        except Exception as e:
-            print(f"Error collecting data for {month_key}: {str(e)}")
-        
-        # Move to next month
-        current_date = month_end
-    
-    return monthly_data
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def ensure_data_dir(base_dir='data'):
     """Create data directory if it doesn't exist"""
@@ -56,31 +14,73 @@ def ensure_data_dir(base_dir='data'):
         os.makedirs(base_dir)
     return base_dir
 
-# Calculate dates for the past year
-end_date = datetime.now()
-start_date = end_date - timedelta(days=30)
-
-# Ensure data directory exists
-data_dir = ensure_data_dir()
-
-# Collect the samples
-print(f"Collecting flight samples from {start_date.date()} to {end_date.date()}")
-monthly_samples = get_monthly_samples(start_date, end_date, samples_per_month=10)
-
-# Save and print summary of collected data
-for month, data in monthly_samples.items():
-    print(f"\nMonth: {month}")
-    print(f"Number of flights: {len(data['flights'])}")
-    print(f"Number of state vectors: {len(data['state_vectors'])}")
+def process_month(year: int, month: int, airport: str = 'KATL', data_dir: str = 'data'):
+    """
+    Process and save data for a single month
     
-    # Save flights data
-    flights_file = os.path.join(data_dir, f'flights_{month}.csv')
-    data['flights'].to_csv(flights_file, index=False)
-    print(f"Saved flights to {flights_file}")
+    Args:
+        year: Year to process
+        month: Month to process (1-12)
+        airport: Airport ICAO code
+        data_dir: Directory to save data
+    """
+    # Calculate start and end dates
+    start_date = datetime(year, month, 1)
+    if month == 12:
+        end_date = datetime(year + 1, 1, 1)
+    else:
+        end_date = datetime(year, month + 1, 1)
     
-    # Save state vectors data
-    vectors_file = os.path.join(data_dir, f'state_vectors_{month}.csv')
-    data['state_vectors'].to_csv(vectors_file, index=False)
-    print(f"Saved state vectors to {vectors_file}")
+    month_key = start_date.strftime('%Y-%m')
+    logger.info(f"Processing {month_key}...")
+    
+    # Initialize loader and get data
+    loader = OpenSkyLoader(request_delay=2.0)
+    try:
+        data = loader.get_flights_with_vectors(
+            start_time=start_date,
+            end_time=end_date,
+            airport=airport,
+            region='georgia'
+        )
+        
+        if data['flights'].empty:
+            logger.warning(f"No data found for {month_key}")
+            return
+        
+        # Save the data
+        flights_file = os.path.join(data_dir, f'flights_{month_key}.csv')
+        vectors_file = os.path.join(data_dir, f'state_vectors_{month_key}.csv')
+        
+        data['flights'].to_csv(flights_file, index=False)
+        data['state_vectors'].to_csv(vectors_file, index=False)
+        
+        logger.info(f"Saved {len(data['flights'])} flights and "
+                   f"{len(data['state_vectors'])} vectors for {month_key}")
+        
+    except Exception as e:
+        logger.error(f"Error processing {month_key}: {str(e)}")
 
-print("\nAll data has been saved to the 'data' directory")
+if __name__ == "__main__":
+    # Ensure data directory exists
+    data_dir = ensure_data_dir()
+    
+    # Process the last 12 months
+    end_date = datetime.now()
+    current_date = end_date - timedelta(days=30)
+    
+    # Round to start of current month
+    current_date = current_date.replace(day=1, hour=0, minute=0, second=0)
+    
+    logger.info(f"Processing data from {current_date.date()} to {end_date.date()}")
+    
+    while current_date < end_date:
+        process_month(current_date.year, current_date.month, data_dir=data_dir)
+        
+        # Move to next month
+        if current_date.month == 12:
+            current_date = current_date.replace(year=current_date.year + 1, month=1)
+        else:
+            current_date = current_date.replace(month=current_date.month + 1)
+    
+    logger.info("Processing complete!")
