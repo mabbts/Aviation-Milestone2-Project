@@ -16,7 +16,7 @@ def get_monthly_samples(start_date, end_date, airport='KATL', samples_per_month=
     Returns:
         Dictionary containing all flight and vector data, organized by month
     """
-    loader = OpenSkyLoader()
+    loader = OpenSkyLoader(request_delay=2.0)
     monthly_data = {}
     
     current_date = start_date
@@ -28,20 +28,19 @@ def get_monthly_samples(start_date, end_date, airport='KATL', samples_per_month=
         else:
             month_end = current_date.replace(month=current_date.month + 1, day=1)
         
-        # Sample flights for this month
         try:
             month_key = current_date.strftime('%Y-%m')
             print(f"Collecting data for {month_key}...")
             
-            sampled_data = loader.sample_flights_with_vectors(
-                start_time=month_start.strftime('%Y-%m-%d %H:%M:%S'),
-                end_time=month_end.strftime('%Y-%m-%d %H:%M:%S'),
+            monthly_data[month_key] = loader.sample_flights_with_vectors(
+                start_time=month_start,
+                end_time=month_end,
                 n_samples=samples_per_month,
-                airport=airport
+                airport=airport,
+                vector_time_buffer=300
             )
             
-            monthly_data[month_key] = sampled_data
-            print(f"Successfully collected {len(sampled_data['flights'])} flights for {month_key}")
+            print(f"Successfully collected {len(monthly_data[month_key]['flights'])} flights for {month_key}")
             
         except Exception as e:
             print(f"Error collecting data for {month_key}: {str(e)}")
@@ -59,14 +58,14 @@ def ensure_data_dir(base_dir='data'):
 
 # Calculate dates for the past year
 end_date = datetime.now()
-start_date = end_date - timedelta(days=365)
+start_date = end_date - timedelta(days=30)
 
 # Ensure data directory exists
 data_dir = ensure_data_dir()
 
 # Collect the samples
 print(f"Collecting flight samples from {start_date.date()} to {end_date.date()}")
-monthly_samples = get_monthly_samples(start_date, end_date, samples_per_month=100)
+monthly_samples = get_monthly_samples(start_date, end_date, samples_per_month=10)
 
 # Save and print summary of collected data
 for month, data in monthly_samples.items():
