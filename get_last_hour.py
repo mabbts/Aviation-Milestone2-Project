@@ -18,7 +18,8 @@ if __name__ == "__main__":
             start_time='2024-03-01 08:00:00',
             end_time='2024-03-01 09:00:00',
             airport='KATL',  # Atlanta International
-            region='georgia'
+            region='georgia',
+            selected_columns=['flights_data4.icao24', 'callsign', 'lat', 'lon', 'geoaltitude', 'velocity', 'heading', 'vertrate', 'onground', 'estdepartureairport', 'estarrivalairport']
         )
         
         if not flight_data.empty:

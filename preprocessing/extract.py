@@ -126,12 +126,13 @@ def process_large_timeframe(start_time: datetime,
         
         df = get_georgia_data(
             start_time=chunk_start,
-            duration_hours=chunk_hours
+            duration_hours=chunk_hours,
+            cached=False
         )
         
         if not df.empty:
             # Save each chunk to avoid memory issues
-            chunk_file = f"data/georgia_data_{chunk_start.strftime('%Y%m%d_%H')}.parquet"
+            chunk_file = f"../data/georgia_data_2/georgia_data_{chunk_start.strftime('%Y%m%d_%H')}.parquet"
             df.to_parquet(chunk_file)
             logger.info(f"Saved chunk to {chunk_file}")
             
@@ -140,7 +141,7 @@ def process_large_timeframe(start_time: datetime,
     if all_data:
         # Combine all chunks
         final_df = pd.concat(all_data, ignore_index=True)
-        final_df.to_parquet("data/georgia_complete_dataset.parquet")
+        final_df.to_parquet("../data/georgia_data_2/georgia_complete_dataset.parquet")
         logger.info("Saved complete dataset")
         return final_df
     
@@ -148,8 +149,8 @@ def process_large_timeframe(start_time: datetime,
 
 if __name__ == "__main__":
     # Example usage
-    now = datetime.utcnow()
-    start_time = now - timedelta(hours=12)  # Get last 12 hours
+    now = datetime.utcnow() - timedelta(days=7)
+    start_time = now - timedelta(hours=3)  # Get last 12 hours
     
     # Process data in 1-hour chunks
     df = process_large_timeframe(
