@@ -12,6 +12,7 @@ import logging
 from typing import Optional, Dict, Union, List, Any
 import yaml
 from pathlib import Path
+from sqlalchemy import text
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -103,6 +104,20 @@ class OpenSkyLoader:
                           self.default_bounds['east'], self.default_bounds['north'])
 
         try:
+            # Use text() for column names to properly reference them in SQL
+            default_columns = [
+                text(col) for col in [
+                    'time', 'icao24', 'callsign', 'lat', 'lon', 
+                    'velocity', 'heading', 'geoaltitude'
+                ]
+            ]
+            
+            # If specific columns are requested, convert them to text()
+            if selected_columns:
+                columns_to_select = [text(col) for col in selected_columns]
+            else:
+                columns_to_select = default_columns
+            
             return self.trino.history(
                 start=start,
                 stop=stop,
@@ -111,7 +126,7 @@ class OpenSkyLoader:
                 icao24=icao24,
                 cached=self.cache_enabled,
                 compress=self.compression_enabled,
-                selected_columns=selected_columns
+                selected_columns=columns_to_select
             )
         except Exception as e:
             logger.error(f"Failed to load state vectors: {str(e)}")
@@ -152,8 +167,7 @@ class OpenSkyLoader:
                 callsign=callsign,
                 icao24=icao24,
                 cached=self.cache_enabled,
-                compress=self.compression_enabled,
-                extra_columns=['estdepartureairport', 'estarrivalairport']
+                compress=self.compression_enabled
             )
         except Exception as e:
             logger.error(f"Failed to load flights: {str(e)}")
@@ -167,31 +181,103 @@ class OpenSkyLoader:
             time_value = time_value.replace(tzinfo=timezone.utc)
         return time_value
 
+    def sample_flights_with_vectors(
+        self,
+        start_time: Union[datetime, str],
+        end_time: Optional[Union[datetime, str]] = None,
+        n_samples: int = 10,
+        airport: Optional[str] = None,
+        include_vectors: bool = True,
+        vector_time_buffer: Optional[int] = 300  # 5 minutes buffer in seconds
+    ) -> Dict[str, pd.DataFrame]:
+        """
+        Sample flights and optionally get their corresponding state vectors
+        
+        Args:
+            start_time: Start time for query
+            end_time: End time for query (optional)
+            n_samples: Number of flights to sample
+            airport: Filter by either departure or arrival airport
+            include_vectors: Whether to include state vectors
+            vector_time_buffer: Time buffer in seconds to look for state vectors before/after flight times
+            
+        Returns:
+            Dictionary containing 'flights' DataFrame and optionally 'state_vectors' DataFrame
+        """
+        # Get flight samples
+        flights = self.load_flights(
+            start_time=start_time,
+            end_time=end_time,
+            airport=airport
+        )
+        
+        if flights.empty:
+            logger.warning("No flights found for the given criteria")
+            return {'flights': pd.DataFrame()}
+            
+        # Sample flights
+        sampled_flights = flights.sample(n=min(n_samples, len(flights)))
+        
+        result = {'flights': sampled_flights}
+        
+        # Get corresponding state vectors if requested
+        if include_vectors:
+            all_vectors = []
+            
+            for _, flight in sampled_flights.iterrows():
+                # Get flight times
+                firstseen = flight.get('firstseen')
+                lastseen = flight.get('lastseen')
+                
+                if firstseen and lastseen:
+                    # Add buffer to search window
+                    vector_start = firstseen - pd.Timedelta(seconds=vector_time_buffer)
+                    vector_end = lastseen + pd.Timedelta(seconds=vector_time_buffer)
+                    
+                    # Get state vectors for this flight
+                    vectors = self.load_state_vectors(
+                        start_time=vector_start,
+                        end_time=vector_end,
+                        icao24=flight.get('icao24'),
+                        callsign=flight.get('callsign')
+                    )
+                    
+                    if not vectors.empty:
+                        # Add flight identifier columns
+                        vectors['flight_id'] = flight.get('flight_id', '')
+                        vectors['firstseen'] = firstseen
+                        vectors['lastseen'] = lastseen
+                        all_vectors.append(vectors)
+            
+            if all_vectors:
+                result['state_vectors'] = pd.concat(all_vectors, ignore_index=True)
+            else:
+                result['state_vectors'] = pd.DataFrame()
+                logger.warning("No state vectors found for the sampled flights")
+        
+        return result
+
 # Usage Example
 if __name__ == "__main__":
     loader = OpenSkyLoader(config_path='config.yaml', default_region='georgia')
     try:
-        # Get state vectors
-        state_vectors = loader.load_state_vectors(
+        # Sample flights with their state vectors
+        print("\nSampling flights with state vectors...")
+        sampled_data = loader.sample_flights_with_vectors(
             start_time='2024-03-01 08:00:00',
             end_time='2024-03-01 09:00:00',
-            selected_columns=['time', 'icao24', 'callsign', 'lat', 'lon', 'velocity', 'heading']
+            n_samples=5,
+            airport='KATL',  # Atlanta International
+            vector_time_buffer=300  # 5 minutes buffer
         )
         
-        if not state_vectors.empty:
-            print(f"Loaded {len(state_vectors)} state vectors")
-            print("Sample data:\n", state_vectors.head(3))
+        if not sampled_data['flights'].empty:
+            print(f"\nSampled {len(sampled_data['flights'])} flights")
+            print("Sample flights data:\n", sampled_data['flights'][['icao24', 'callsign', 'firstseen', 'lastseen']].head())
             
-        # Get flights
-        flights = loader.load_flights(
-            start_time='2024-03-01 08:00:00',
-            end_time='2024-03-01 09:00:00',
-            airport='KATL'  # Atlanta International
-        )
-        
-        if not flights.empty:
-            print(f"\nLoaded {len(flights)} flights")
-            print("Sample data:\n", flights.head(3))
+            if 'state_vectors' in sampled_data and not sampled_data['state_vectors'].empty:
+                print(f"\nFound {len(sampled_data['state_vectors'])} state vectors")
+                print("Sample state vectors:\n", sampled_data['state_vectors'][['time', 'icao24', 'callsign', 'lat', 'lon']].head())
             
     except Exception as e:
-        print(f"Data loading failed: {str(e)}") 
+        print(f"Data loading failed: {str(e)}")

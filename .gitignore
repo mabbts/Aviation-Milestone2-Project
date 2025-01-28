@@ -5,3 +5,5 @@ data/
 flight_samples/
 
 test.py
+
+*.pyc
