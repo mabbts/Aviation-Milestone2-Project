@@ -44,7 +44,7 @@ def get_random_dates(start_date: datetime, end_date: datetime, n_samples: int = 
     # Sort dates for better organization
     return sorted(random_dates)
 
-def process_sample(sample_time: datetime, airport: str = 'KATL', data_dir: str = 'data', sample_duration: int = 1):
+def process_sample(sample_time: datetime, airport: str = 'KATL', data_dir: str = 'data', sample_duration: int = 1, limit: int = 1000):
     """
     Process and save data for a single time sample
     
@@ -53,6 +53,7 @@ def process_sample(sample_time: datetime, airport: str = 'KATL', data_dir: str =
         airport: Airport ICAO code
         data_dir: Directory to save data
         sample_duration: Duration in hours to sample
+        limit: Maximum number of records to return per sample
     """
     # Calculate end time
     end_time = sample_time + timedelta(hours=sample_duration)
@@ -67,7 +68,8 @@ def process_sample(sample_time: datetime, airport: str = 'KATL', data_dir: str =
             start_time=sample_time,
             end_time=end_time,
             airport=airport,
-            region='georgia'
+            region='georgia',
+            limit=limit
         )
         
         if data.empty:

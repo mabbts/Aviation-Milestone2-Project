@@ -81,7 +81,8 @@ class OpenSkyLoader:
         airport: Optional[str] = None,
         callsign: Optional[str] = None,
         icao24: Optional[str] = None,
-        selected_columns: Optional[List[str]] = None
+        selected_columns: Optional[List[str]] = None,
+        limit: Optional[int] = 1000
     ) -> pd.DataFrame:
         """
         Load flight data and state vectors from OpenSky using the history method
@@ -97,6 +98,7 @@ class OpenSkyLoader:
             callsign: Filter by callsign (wildcards allowed)
             icao24: Filter by aircraft transponder code
             selected_columns: List of columns to retrieve
+            limit: Maximum number of records to return (default: 1000)
         """
         time.sleep(self.request_delay)
         
@@ -138,7 +140,8 @@ class OpenSkyLoader:
                 time_buffer=self.time_buffer,
                 cached=self.cache_enabled,
                 compress=self.compression_enabled,
-                selected_columns=columns_to_select
+                selected_columns=columns_to_select,
+                limit=limit
             )
         except Exception as e:
             logger.error(f"Failed to load flight data: {str(e)}")
