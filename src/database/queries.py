@@ -71,3 +71,42 @@ class OpenSkyQueries:
             end_time=end_time,
             where_clause=where_clause
         )
+
+    @staticmethod
+    def get_aircraft_flights(
+        start_time: int,
+        end_time: int,
+        icao24: str
+    ) -> str:
+        """
+        Get flight data for a specific aircraft within a time range.
+        
+        Args:
+            start_time: Unix timestamp for start time
+            end_time: Unix timestamp for end time
+            icao24: Aircraft's ICAO24 identifier
+            
+        Returns:
+            SQL query string
+        """
+        return """
+        SELECT
+            firstseen,
+            lastseen,
+            callsign,
+            estdepartureairport,
+            estarrivalairport,
+            takeofflatitude as departure_lat,
+            takeofflongitude as departure_lon, 
+            landinglatitude as arrival_lat,
+            landinglongitude as arrival_lon
+        FROM flights_data5
+        WHERE
+            firstseen BETWEEN {start_time} AND {end_time}
+            AND icao24 = '{icao24}'
+        ORDER BY firstseen
+        """.format(
+            start_time=start_time,
+            end_time=end_time,
+            icao24=icao24
+        )
