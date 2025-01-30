@@ -29,8 +29,12 @@ queries = {
         SELECT *
         FROM flights_data5
         WHERE firstseen BETWEEN {start_time} AND {end_time}
-        AND array_any(t -> t.latitude BETWEEN {south} AND {north}
-            AND t.longitude BETWEEN {west} AND {east}, track)
+        AND EXISTS (
+            SELECT 1
+            FROM UNNEST(track) t
+            WHERE t.latitude BETWEEN {south} AND {north}
+            AND t.longitude BETWEEN {west} AND {east}
+        )
         LIMIT 100
     """,
     

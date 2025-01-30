@@ -1,4 +1,4 @@
-from data_loader import OpenSkyLoader
+from backup.data_loader import OpenSkyLoader
 
 # Usage Example
 # - snapshot of aircraft activity around Atlanta airport within a specific hour on March 1st, 2024, 

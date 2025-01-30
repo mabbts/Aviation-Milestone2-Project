@@ -5,7 +5,7 @@ Collects sample flight data from OpenSky for each month in the past year.
 Uses the OpenSkyLoader to fetch both state vectors and flight information.
 """
 
-from data_loader import OpenSkyLoader
+from backup.data_loader import OpenSkyLoader
 from datetime import datetime, timedelta
 import pandas as pd
 import logging
