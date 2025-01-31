@@ -9,6 +9,8 @@ from pyopensky.trino import Trino
 from datetime import datetime, timedelta
 import pandas as pd
 import logging
+import os
+import pathlib
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -107,6 +109,7 @@ def get_georgia_data(start_time: datetime,
         raise
 
 def process_large_timeframe(start_time: datetime, 
+                          output_dir: str,
                           total_hours: int = 24,
                           chunk_hours: int = 1):
     """
@@ -119,6 +122,7 @@ def process_large_timeframe(start_time: datetime,
     """
     
     all_data = []
+    chunk_files = []  # Keep track of chunk files
     
     for hour in range(0, total_hours, chunk_hours):
         chunk_start = start_time + timedelta(hours=hour)
@@ -132,17 +136,27 @@ def process_large_timeframe(start_time: datetime,
         
         if not df.empty:
             # Save each chunk to avoid memory issues
-            chunk_file = f"../data/georgia_data_2/georgia_data_{chunk_start.strftime('%Y%m%d_%H')}.parquet"
+            chunk_file = f"{output_dir}/georgia_data_{chunk_start.strftime('%Y%m%d_%H')}.parquet"
             df.to_parquet(chunk_file)
             logger.info(f"Saved chunk to {chunk_file}")
             
             all_data.append(df)
+            chunk_files.append(chunk_file)  # Store chunk file path
     
     if all_data:
         # Combine all chunks
         final_df = pd.concat(all_data, ignore_index=True)
-        final_df.to_parquet("../data/georgia_data_2/georgia_complete_dataset.parquet")
+        final_df.to_parquet(f"{output_dir}/georgia_complete_dataset.parquet")
         logger.info("Saved complete dataset")
+        
+        # Clean up chunk files
+        for chunk_file in chunk_files:
+            try:
+                os.remove(chunk_file)
+                logger.info(f"Deleted chunk file: {chunk_file}")
+            except Exception as e:
+                logger.warning(f"Failed to delete chunk file {chunk_file}: {str(e)}")
+        
         return final_df
     
     return pd.DataFrame()
@@ -150,12 +164,16 @@ def process_large_timeframe(start_time: datetime,
 if __name__ == "__main__":
     # Example usage
     now = datetime.utcnow() - timedelta(days=7)
-    start_time = now - timedelta(hours=3)  # Get last 12 hours
-    
+    start_time = now
+
+    output_dir = pathlib.Path(__file__).parent.parent.parent / "data" / "georgia_data_2"
+    output_dir = output_dir.resolve()
+
     # Process data in 1-hour chunks
     df = process_large_timeframe(
         start_time=start_time,
-        total_hours=12,
+        output_dir=str(output_dir),
+        total_hours=72,
         chunk_hours=1
     )
     

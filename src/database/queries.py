@@ -110,3 +110,88 @@ class OpenSkyQueries:
             end_time=end_time,
             icao24=icao24
         )
+
+    @staticmethod
+    def get_detailed_flight_data(
+        start_time: int,
+        end_time: int,
+    ) -> str:
+        """
+        Get detailed flight data including duration and track information within geographical bounds.
+        
+        Args:
+            start_time: Unix timestamp for start time
+            end_time: Unix timestamp for end time
+            
+        Returns:
+            SQL query string that returns flight details including:
+            - Basic flight identifiers (icao24, callsign)
+            - Departure and arrival information
+            - Flight timing and duration
+            - Track data array
+        """
+        return """
+        SELECT
+            f.icao24,
+            f.callsign,
+            f.airportofdeparture,
+            f.airportofdestination,
+            f.takeofftime,
+            f.landingtime,
+            (f.landingtime - f.takeofftime) as flight_duration,
+            f.takeofflatitude,
+            f.takeofflongitude,
+            f.landinglatitude,
+            f.landinglongitude,
+            f.track
+        FROM
+            flights_data5 f
+        WHERE
+            f.takeofftime BETWEEN {start_time} AND {end_time}
+        ORDER BY
+            f.takeofftime
+        """.format(
+            start_time=start_time,
+            end_time=end_time,
+        )
+
+    @staticmethod
+    def get_flight_data_v4(
+        start_time: int,
+        end_time: int,
+    ) -> str:
+        """
+        Get flight data from flights_data4 table with estimated airports and track information.
+        
+        Args:
+            start_time: Unix timestamp for start time
+            end_time: Unix timestamp for end time
+            
+        Returns:
+            SQL query string that returns:
+            - ICAO24 identifier
+            - Callsign
+            - Estimated departure/arrival airports
+            - Flight timing
+            - Track coordinates
+        """
+        return """
+        SELECT
+            f.icao24,
+            f.callsign,
+            f.estdepartureairport,
+            f.estarrivalairport,
+            f.firstseen,
+            f.lastseen,
+            (f.lastseen - f.firstseen) as flight_duration,
+            f.track
+        FROM
+            flights_data4 f
+        WHERE
+            f.firstseen BETWEEN {start_time} AND {end_time}
+        ORDER BY
+            f.firstseen
+        """.format(
+            start_time=start_time,
+            end_time=end_time,
+        )

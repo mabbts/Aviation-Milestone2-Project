@@ -1,3 +1,6 @@
 pyOpenSky
 requests
 haversine
+pandas
+matplotlib
+seaborn
