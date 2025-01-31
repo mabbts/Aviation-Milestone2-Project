@@ -24,7 +24,7 @@ def basic_usage_examples():
             airport=airport_code
         )
         return flights
-
+  
     # Example 2: Track specific aircraft
     def track_aircraft(icao24: str, start_time: datetime):
         """Get flight history for a specific aircraft."""

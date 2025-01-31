@@ -1,6 +1,6 @@
 # Milestone II: Big Data Project
 
-Welcome to the **Milestone II** repository, a project for the SIADS 696 course at the University of Michigan. This project explores **big data concepts and applications**, focusing on aviation data from the **OpenSky Network**. 
+Welcome to the **Milestone II** repository, a project for the SIADS 696 course at the University of Michigan. This project explores **Supervised Learning and Unsupervised Learning**, focusing on aviation data from the **OpenSky Network**. 
 
 ## Project Overview
 
@@ -12,7 +12,48 @@ The primary goal of this project is to leverage the OpenSky aviation ADS-B datas
 - **Big Data Processing**: Utilize scalable tools to handle large volumes of data efficiently.
 - **Visualization and Reporting**: Create intuitive visualizations and summaries to present findings.
 - **Predictive Modeling**: Develop models to forecast flight behaviors, anomalies, or other aviation metrics.
-- **Reproducibility**: Document workflows and provide scripts to replicate the analysis and results.
+- **Reproducibility**: Document workflows and provide scripts to replicate the analysis and results.s
+
+## Project Structure
+
+```
+.
+├── src/
+│ ├── analysis/ # Analysis and aggregation scripts
+│ ├── database/ # Database queries and connections
+│ ├── utils/ # Constants and utility functions
+├── notebooks/ # Jupyter notebooks for exploration
+├── tests/ # Test scripts
+├── docs/ # Documentation
+└── preprocessing/ # Data preprocessing scripts
+```
+
+
+## Key Components
+
+### Database Queries
+The `src/database/queries.py` module contains a collection of SQL queries for the OpenSky Trino database, including:
+- Flight aggregation queries
+- Flight path tracking
+- Aircraft-specific queries
+
+### Analysis Tools
+Located in `src/analysis/`, including:
+- Flight data aggregations
+- Statistical analysis
+- Pattern recognition
+
+### Data Processing Scripts
+The `preprocessing/` directory contains scripts for:
+- Extracting flight data for Georgia
+- Processing raw ADS-B data
+- Data cleaning and transformation
+
+### Configuration
+Key constants and configurations in `src/utils/constants.py`:
+- Georgia geographical bounds
+- Airport definitions
+- Time window configurations
 
 ## Features
 
@@ -35,4 +76,4 @@ The primary goal of this project is to leverage the OpenSky aviation ADS-B datas
 
 ## Contributing
 
-This project is part of an academic course, but external contributions, feedback, or ideas are welcome. Please open an issue or submit a pull request if you’d like to contribute.
+This project is part of an academic course, but external contributions, feedback, or ideas are welcome. 
