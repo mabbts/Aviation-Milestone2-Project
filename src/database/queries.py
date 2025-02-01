@@ -147,7 +147,8 @@ class OpenSkyQueries:
         FROM
             flights_data5 f
         WHERE
-            f.takeofftime BETWEEN {start_time} AND {end_time}
+            f.day BETWEEN FLOOR({start_time}/86400.0) AND FLOOR({end_time}/86400.0)
+            AND f.takeofftime BETWEEN {start_time} AND {end_time}
         ORDER BY
             f.takeofftime
         """.format(
