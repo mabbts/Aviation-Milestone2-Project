@@ -107,3 +107,41 @@ def get_flight_data_chunks(start_date: str, end_date: str, output_dir: str) -> N
                 print(f"No data returned for interval {interval_start} to {interval_end}.")
         except Exception as e:
             print(f"Error processing interval {interval_start} to {interval_end}: {e}")
+
+def get_sampled_flight_data(start_date: str, end_date: str, n_samples: int) -> list[pd.DataFrame]:
+    """
+    Get flight data for n randomly sampled dates between start and end date.
+    
+    Args:
+        start_date: Start date in 'YYYY-MM-DD' format
+        end_date: End date in 'YYYY-MM-DD' format
+        n_samples: Number of random dates to sample
+        
+    Returns:
+        List of DataFrames containing flight data for each sampled date
+    """
+    # Convert string dates to datetime
+    start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+    end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+    
+    # Get random dates using sample_dates
+    from ..utils.utils import sample_dates
+    sampled_dates = sample_dates(start_dt, end_dt, n_samples)
+    
+    # Sort dates for clearer output
+    sampled_dates.sort()
+    
+    # Get flight data for each sampled date
+    results = []
+    for date in sampled_dates:
+        date_str = date.strftime('%Y-%m-%d')
+        print(f"Getting flight data for {date_str}")
+        
+        try:
+            df = get_detailed_flights(date_str, date_str)
+            results.append(df)
+            print(f"Retrieved {len(df)} flights for {date_str}")
+        except Exception as e:
+            print(f"Error retrieving data for {date_str}: {e}")
+    
+    return results
