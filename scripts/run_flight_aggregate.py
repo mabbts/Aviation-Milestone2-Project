@@ -1,4 +1,4 @@
-from ..analysis.aggregations import get_flight_aggregates
+from ..src.analysis.aggregations import get_flight_aggregates
 
 def main():
     # Define date range
