@@ -1,6 +1,17 @@
 from datetime import datetime, timedelta
 import random
 
+def parse_date(date_str: str) -> datetime:
+    """
+    Parse a date string in either YYYY-MM-DD or YYYY-MM-DD HH:MM:SS format.
+    """
+    for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d'):
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+    raise ValueError(f"Unsupported date format for {date_str}.")
+
 def sample_dates(start, stop, n):
     """
     Sample n random datetime objects between start and stop.
