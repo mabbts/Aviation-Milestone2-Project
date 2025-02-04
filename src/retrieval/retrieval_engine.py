@@ -30,9 +30,14 @@ def retrieve_data_by_intervals(
         file_name = f"{prefix}_{start_ts}_{end_ts}.parquet"
         parquet_file = output_path / file_name
         
+        print(f"[retrieve_data_by_intervals] Processing interval {start_ts} to {end_ts}")
         query = query_fn(start_ts, end_ts)
+        print(f"[retrieve_data_by_intervals] Executing query: {query}")
+        
         try:
             df = trino.query(query)
+            print(f"[retrieve_data_by_intervals] Query returned {len(df)} rows")
+            
             if maybe_save_parquet(df, parquet_file, skip_if_exists):
                 print(f"[retrieve_data_by_intervals] Wrote {file_name} ({len(df)} rows).")
             else:
