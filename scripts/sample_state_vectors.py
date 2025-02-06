@@ -1,13 +1,12 @@
 import sys
-import os
+from pathlib import Path
 
-# Add the project root to sys.path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+# Add project root to Python path
+sys.path.insert(0, str(Path(__file__).parent.parent.resolve())) 
 
 from src.pipeline.state_vector_pipeline import StateVectorPipeline
 from src.utils.paths import DATA_DIR
+
 
 StateVectorPipeline.sample_state_vectors(
     start_date="2024-01-01 12:00:00",

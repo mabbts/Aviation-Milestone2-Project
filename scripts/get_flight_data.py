@@ -1,10 +1,8 @@
 import sys
-import os
+from pathlib import Path
 
 # Add the project root to sys.path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 from src.pipeline.flight_pipeline import FlightsPipeline
 from src.utils.paths import DATA_DIR
