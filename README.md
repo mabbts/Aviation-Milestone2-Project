@@ -57,6 +57,7 @@ Below is a high-level overview of the repository layout:
 
 ```
 .
+├── setup.py
 ├── scripts/
 │   ├── get_flight_data.py
 │   ├── get_state_vector_data.py
@@ -95,7 +96,7 @@ Below is a high-level overview of the repository layout:
 - **scripts**: Python entry-point scripts for retrieving or processing data.
 - **src**:  
   - **pipeline**: High-level workflow pipelines (e.g., retrieving chunked or sampled flights, state vectors).  
-  - **queries**: SQL query builders for OpenSky’s Trino database.  
+  - **queries**: SQL query builders for OpenSky's Trino database.  
   - **retrieval**: Core retrieval engine and interval generation (chunked or random sampling).  
   - **transformations**: Data transformation and preprocessing logic (e.g., computing flight track metrics).  
   - **utils**: Shared utilities (paths, file handling, constants, date/time parsing, etc.).
@@ -143,7 +144,7 @@ These pipelines rely on **interval generation** (e.g., `generate_chunk_intervals
 
 - **`flight_preprocessing.py`**  
   - **`compute_track_metrics`**: Given a flight track, computes min/max/mean of latitude, longitude, altitude, heading, and on-ground percentage.  
-  - **`preprocess_flight_data`**: Applies `compute_track_metrics` to a DataFrame’s `track` column, returns new columns (e.g., `time_min`, `time_max`, etc.).
+  - **`preprocess_flight_data`**: Applies `compute_track_metrics` to a DataFrame's `track` column, returns new columns (e.g., `time_min`, `time_max`, etc.).
 
 ### Utilities
 
@@ -177,10 +178,15 @@ Each script can be run directly (e.g., `python scripts/get_flight_data.py`) once
 
 ## Example Usage
 
-1. **Install** dependencies (e.g., from `requirements.txt` or your environment file):
+1. **Run the setup script** to create the virtual environment and install dependencies:
    ```bash
-   pip install -r requirements.txt
+   python setup.py
    ```
+   This will:
+   - Create the necessary data directories (`data/raw` and `data/processed`)
+   - Set up a virtual environment in `.venv`
+   - Install all required dependencies from `requirements.txt`
+
 2. **Configure** your environment with credentials/permissions to query the OpenSky Trino endpoint.
 
 3. **Retrieve chunked flights**:
