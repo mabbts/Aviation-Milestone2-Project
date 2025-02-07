@@ -4,3 +4,9 @@ haversine
 pandas
 matplotlib
 seaborn
+pyarrow
+numpy
+scikit-learn
+missingno
+dask
+statsmodels

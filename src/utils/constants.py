@@ -8,5 +8,12 @@ GEORGIA_BOUNDS = {
 }
 
 GEORGIA_AIRPORTS = {
-    "KATL": "Hartsfield-JacksonAtlanta International Airport"
+    "KATL": "Hartsfield-JacksonAtlanta International Airport",
+    "KSAV": "Savannah/Hilton Head International Airport",
+    "KAGS": "Augusta Regional Airport",
+    "KCSG": "Columbus Airport",
+    "KVLD": "Valdosta Regional Airport",
+    "KBQK": "Brunswick Golden Isles Airport",
+    "KABY": "Southwest Georgia Regional Airport",
+    "KMCN": "Middle Georgia Regional Airport"
 }
