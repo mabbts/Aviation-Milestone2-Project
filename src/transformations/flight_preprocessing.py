@@ -1,8 +1,10 @@
-# flight_preprocessing.py
-import re
+"""
+This module provides functions for preprocessing flight data.
+It includes a function to compute aggregate metrics from the 'track' column.
+"""
+
 import numpy as np
 import pandas as pd
-from pathlib import Path
 
 def compute_track_metrics(track):
     """

@@ -1,7 +1,9 @@
-# interval_generation.py
+"""
+This module provides utility functions for generating time intervals.
+These intervals are used for retrieving data in chunks or samples.
+"""
 from datetime import datetime, timedelta
 import random
-import math
 import pandas as pd
 
 def generate_chunk_intervals(
@@ -10,8 +12,16 @@ def generate_chunk_intervals(
     chunk_hours: float = 1.0
 ) -> list[tuple[int, int]]:
     """
-    Generate a list of (start_timestamp, end_timestamp) pairs 
-    that cover [start_dt, end_dt) in increments of chunk_hours.
+    Generate a list of time intervals (start_timestamp, end_timestamp) pairs.
+    These intervals cover the range [start_dt, end_dt) in increments of chunk_hours.
+
+    Args:
+        start_dt (datetime): The starting datetime for the interval generation.
+        end_dt (datetime): The ending datetime for the interval generation.
+        chunk_hours (float): The duration of each interval in hours. Defaults to 1.0.
+
+    Returns:
+        list[tuple[int, int]]: A list of tuples, where each tuple contains the start and end timestamps (Unix epoch time) of an interval.
     """
     intervals = []
     current_dt = start_dt
@@ -35,8 +45,20 @@ def generate_sample_intervals(
     interval_hours: float = 24.0
 ) -> list[tuple[int, int]]:
     """
-    Generate n random intervals of length interval_hours between start_dt and end_dt.
-    Each interval is (start_timestamp, end_timestamp).
+    Generate n random time intervals of length interval_hours between start_dt and end_dt.
+    Each interval is represented as a tuple (start_timestamp, end_timestamp).
+
+    Args:
+        start_dt (datetime): The starting datetime for the sampling window.
+        end_dt (datetime): The ending datetime for the sampling window.
+        n_samples (int): The number of random intervals to generate.
+        interval_hours (float): The length of each interval in hours. Defaults to 24.0.
+
+    Returns:
+        list[tuple[int, int]]: A list of tuples, where each tuple contains the start and end timestamps (Unix epoch time) of a sampled interval.
+
+    Raises:
+        ValueError: If interval_hours is too large for the given date range.
     """
     total_window_seconds = (end_dt - start_dt).total_seconds()
     interval_seconds = interval_hours * 3600
@@ -45,7 +67,6 @@ def generate_sample_intervals(
         raise ValueError("interval_hours is too large for the given date range.")
     
     intervals = []
-    # The latest start point is total_window_seconds - interval_seconds
     max_start_seconds = total_window_seconds - interval_seconds
     
     for _ in range(n_samples):

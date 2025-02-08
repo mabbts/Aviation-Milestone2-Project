@@ -1,8 +1,12 @@
+"""
+This script samples state vector data and saves the samples to a specified directory.
+It uses the StateVectorPipeline to fetch the data.
+"""
 import sys
 from pathlib import Path
 
 # Add project root to Python path
-sys.path.insert(0, str(Path(__file__).parent.parent.resolve())) 
+sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 from src.pipeline.state_vector_pipeline import StateVectorPipeline
 from src.utils.paths import DATA_DIR
@@ -15,4 +19,4 @@ StateVectorPipeline.sample_state_vectors(
     n_samples=30,
     interval_hours=1,
     skip_if_exists=True
-) 
+)

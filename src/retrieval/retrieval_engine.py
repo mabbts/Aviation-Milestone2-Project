@@ -1,4 +1,8 @@
-# retrieval_engine.py
+"""
+This module provides a generic data retrieval function that retrieves data over a list of time intervals,
+using a provided query function, and saves the results to parquet files.
+"""
+
 import os
 from pathlib import Path
 import pandas as pd
@@ -13,13 +17,14 @@ def retrieve_data_by_intervals(
     skip_if_exists: bool = True
 ):
     """
-    Generic data retrieval over a list of intervals.
-    
-    intervals: list of (start_timestamp, end_timestamp)
-    query_fn: function that takes (start_time, end_time) -> SQL query string
-    output_dir: where parquet files should be written
-    prefix: filename prefix (e.g. "flight_v4")
-    skip_if_exists: if True, skip intervals that already have a non-empty parquet file
+    Retrieve data over a list of time intervals using a provided query function and save results to parquet files.
+
+    Args:
+        intervals (list[tuple[int, int]]): A list of tuples, where each tuple contains the start and end timestamps (Unix epoch time) of an interval.
+        query_fn (function): A function that accepts a start time and end time (both as integers) and returns an SQL query string.
+        output_dir (str): The directory where the parquet files should be written.
+        prefix (str): The filename prefix for the parquet files (e.g., "flight_v4").
+        skip_if_exists (bool, optional): If True, skip retrieval for intervals that already have a non-empty parquet file. Defaults to True.
     """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)

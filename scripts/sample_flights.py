@@ -1,3 +1,7 @@
+"""
+This script samples flight data and saves the samples to a specified directory.
+It uses the FlightsPipeline to fetch the data.
+"""
 import sys
 from pathlib import Path
 

@@ -5,6 +5,9 @@ from ..retrieval.retrieval_engine import retrieve_data_by_intervals
 from ..utils.time_utils import parse_date
 
 class StateVectorPipeline:
+    """
+    Pipeline for retrieving state vector data.
+    """
     @staticmethod
     def chunked_state_vectors(
         start_date: str,
@@ -15,6 +18,13 @@ class StateVectorPipeline:
     ):
         """
         Retrieve state vector data in standard chunks between start_date and end_date.
+
+        Args:
+            start_date (str): Start date for data retrieval (e.g., 'YYYY-MM-DD HH:MM:SS').
+            end_date (str): End date for data retrieval (e.g., 'YYYY-MM-DD HH:MM:SS').
+            output_dir (str): Directory to save the retrieved data chunks.
+            chunk_hours (float): Duration of each chunk in hours. Defaults to 1.0.
+            skip_if_exists (bool): If True, skip retrieval if the file already exists. Defaults to True.
         """
         # Convert string dates to datetime objects.
         start_dt = parse_date(start_date)
@@ -25,6 +35,7 @@ class StateVectorPipeline:
 
         # Define query function using the StateVectorQueries.
         def query_fn(s, e):
+            """Retrieves state vector data for the given start and end datetimes."""
             return StateVectorQueries.get_state_vectors(s, e)
 
         # Retrieve data using the generated intervals.
@@ -53,6 +64,7 @@ class StateVectorPipeline:
                                      If greater than 1, the interval will be chunked into 1-hour segments.
             skip_if_exists (bool): If True, skip writing if the output file already exists.
         """
+        # Parse start and end dates into datetime objects
         start_dt = parse_date(start_date)
         end_dt = parse_date(end_date)
 
@@ -72,6 +84,7 @@ class StateVectorPipeline:
 
         # Define query function.
         def query_fn(s, e):
+            """Retrieves state vector data for the given start and end datetimes."""
             return StateVectorQueries.get_state_vectors(s, e)
 
         # Retrieve the sampled data.
@@ -81,4 +94,4 @@ class StateVectorPipeline:
             output_dir,
             prefix="state_vectors_sample",
             skip_if_exists=skip_if_exists
-        ) 
+        )
