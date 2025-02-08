@@ -1,4 +1,8 @@
-# flights_pipeline.py
+"""
+This module provides a pipeline for retrieving flight data.
+It includes functions for retrieving data in standard chunks and by sampling.
+"""
+
 from datetime import datetime
 from ..queries.flight_queries import FlightQueries
 from ..retrieval.interval_generation import (

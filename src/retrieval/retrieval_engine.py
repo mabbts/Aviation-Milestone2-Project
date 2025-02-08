@@ -3,9 +3,7 @@ This module provides a generic data retrieval function that retrieves data over 
 using a provided query function, and saves the results to parquet files.
 """
 
-import os
 from pathlib import Path
-import pandas as pd
 from pyopensky.trino import Trino
 from src.utils.file_utils import maybe_save_parquet
 
@@ -31,6 +29,7 @@ def retrieve_data_by_intervals(
 
     trino = Trino()
 
+    # Iterate over the intervals and retrieve data.
     for (start_ts, end_ts) in intervals:
         file_name = f"{prefix}_{start_ts}_{end_ts}.parquet"
         parquet_file = output_path / file_name
@@ -40,9 +39,11 @@ def retrieve_data_by_intervals(
         print(f"[retrieve_data_by_intervals] Executing query: {query}")
         
         try:
+            # Execute the query and retrieve the data.
             df = trino.query(query)
             print(f"[retrieve_data_by_intervals] Query returned {len(df)} rows")
             
+            # Save the data to a parquet file if it doesn't already exist.
             if maybe_save_parquet(df, parquet_file, skip_if_exists):
                 print(f"[retrieve_data_by_intervals] Wrote {file_name} ({len(df)} rows).")
             else:
