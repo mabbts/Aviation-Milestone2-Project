@@ -16,7 +16,7 @@ StateVectorPipeline.sample_state_vectors(
     start_date="2024-01-01 12:00:00",
     end_date="2024-12-31 15:00:00",
     output_dir=DATA_DIR / "raw/state_vectors_samples",
-    n_samples=30,
-    interval_hours=1,
+    n_samples=15,
+    interval_hours=3,
     skip_if_exists=True
 )
