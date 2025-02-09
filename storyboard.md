@@ -70,4 +70,4 @@
 1. **Database Interface**: Using the `pyopensky.trino` library for efficient SQL querying against OpenSky data via Trino.  
 2. **Pipeline Architecture**: Separating retrieval logic (queries, chunking/sampling) from transformations (preprocessing, aggregations).  
 3. **Caching & Skipping**: Implementing file-based caching (`skip_if_exists`) ensures we only download new data, improving performance.  
-4. **Flexible Queries**: Parameterized queries allow filtering by time range, airport, and geographic bounds to handle multiple data scenarios.  
+4. **Flexible Queries**: Parameterized queries allow filtering by time range, airport, and geographic bounds to handle multiple data scenarios.
