@@ -63,12 +63,14 @@ def generate_sample_intervals(
     total_window_seconds = (end_dt - start_dt).total_seconds()
     interval_seconds = interval_hours * 3600
     
+    # Check if the interval is too large for the given date range.
     if interval_seconds > total_window_seconds:
         raise ValueError("interval_hours is too large for the given date range.")
     
     intervals = []
     max_start_seconds = total_window_seconds - interval_seconds
     
+    # Generate the intervals.
     for _ in range(n_samples):
         offset_sec = random.uniform(0, max_start_seconds)
         interval_start_dt = start_dt + timedelta(seconds=offset_sec)
