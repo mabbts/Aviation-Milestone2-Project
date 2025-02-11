@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Tuple
 
 class FlightQueries:
     """
@@ -83,32 +83,49 @@ class FlightQueries:
         """
 
     @staticmethod
-    def get_flight_data_by_icao(icao: Union[str, List[str]]) -> str:
+    def get_flight_data_by_icao(icao: Union[str, List[str]], time_range: Optional[Union[int, Tuple[int, int]]] = None) -> str:
         """
         Generates an SQL query to retrieve flight data from the flights_data4 table filtering
-        by a single ICAO number or a list of ICAO numbers.
+        by a single ICAO number or a list of ICAO numbers. Optionally, the query can be filtered
+        by a specific timestamp or a range of timestamps via the 'firstseen' column.
 
-        This query selects all flight records from flights_data4 where the icao24 field exactly matches
+        This query selects flight records from flights_data4 where the icao24 field exactly matches
         the provided ICAO number, or if a list is provided, where the icao24 field is in the given list.
-        The results are ordered by the 'firstseen' timestamp.
+        If a timestamp is provided as an integer, the results are filtered to only include records matching that time.
+        If a tuple is provided, the results are filtered to include records with firstseen between the start 
+        and end values (inclusive). The results are ordered by the 'firstseen' timestamp.
 
         Args:
             icao (Union[str, List[str]]): A single ICAO24 identifier or a list of ICAO24 identifiers.
+            time_range (Optional[Union[int, Tuple[int, int]]]): An optional parameter that can be either an integer 
+                (to filter for a specific timestamp) or a tuple of two integers (to filter for a range of timestamps).
 
         Returns:
             str: An SQL query string.
 
         Raises:
-            ValueError: If an empty list is provided.
+            ValueError: If an empty list is provided or if a tuple is provided for time_range that does not contain exactly two integers.
         """
         if isinstance(icao, list):
             if not icao:
                 raise ValueError("The list of ICAO identifiers cannot be empty.")
             # Build a comma-separated list of quoted ICAO values.
             icao_list_str = ", ".join([f"'{item}'" for item in icao])
-            condition = f"icao24 IN ({icao_list_str})"
+            icao_condition = f"icao24 IN ({icao_list_str})"
         else:
-            condition = f"icao24 = '{icao}'"
+            icao_condition = f"icao24 = '{icao}'"
+        
+        time_condition = ""
+        if time_range is not None:
+            if isinstance(time_range, int):
+                time_condition = f" AND firstseen = {time_range}"
+            elif isinstance(time_range, tuple):
+                if len(time_range) != 2:
+                    raise ValueError("When passing a tuple for time_range, it must contain exactly two integers (start_time, end_time).")
+                start_time, end_time = time_range
+                time_condition = f" AND firstseen BETWEEN {start_time} AND {end_time}"
+            else:
+                raise ValueError("The time_range parameter must be an int or a tuple of two ints.")
 
         return f"""
         SELECT
@@ -120,6 +137,6 @@ class FlightQueries:
             lastseen,
             track
         FROM flights_data4
-        WHERE {condition}
+        WHERE {icao_condition}{time_condition}
         ORDER BY firstseen
         """
