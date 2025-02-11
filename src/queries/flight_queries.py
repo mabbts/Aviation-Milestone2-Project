@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 
 class FlightQueries:
     """
@@ -80,4 +80,46 @@ class FlightQueries:
         FROM flights_data5
         WHERE takeofftime BETWEEN {start_time} AND {end_time}{airport_condition}
         ORDER BY takeofftime
+        """
+
+    @staticmethod
+    def get_flight_data_by_icao(icao: Union[str, List[str]]) -> str:
+        """
+        Generates an SQL query to retrieve flight data from the flights_data4 table filtering
+        by a single ICAO number or a list of ICAO numbers.
+
+        This query selects all flight records from flights_data4 where the icao24 field exactly matches
+        the provided ICAO number, or if a list is provided, where the icao24 field is in the given list.
+        The results are ordered by the 'firstseen' timestamp.
+
+        Args:
+            icao (Union[str, List[str]]): A single ICAO24 identifier or a list of ICAO24 identifiers.
+
+        Returns:
+            str: An SQL query string.
+
+        Raises:
+            ValueError: If an empty list is provided.
+        """
+        if isinstance(icao, list):
+            if not icao:
+                raise ValueError("The list of ICAO identifiers cannot be empty.")
+            # Build a comma-separated list of quoted ICAO values.
+            icao_list_str = ", ".join([f"'{item}'" for item in icao])
+            condition = f"icao24 IN ({icao_list_str})"
+        else:
+            condition = f"icao24 = '{icao}'"
+
+        return f"""
+        SELECT
+            icao24,
+            callsign,
+            estdepartureairport,
+            estarrivalairport,
+            firstseen,
+            lastseen,
+            track
+        FROM flights_data4
+        WHERE {condition}
+        ORDER BY firstseen
         """

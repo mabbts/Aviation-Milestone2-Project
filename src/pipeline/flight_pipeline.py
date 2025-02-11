@@ -4,6 +4,7 @@ It includes functions for retrieving data in standard chunks and by sampling.
 """
 
 from datetime import datetime
+from typing import List
 from ..queries.flight_queries import FlightQueries
 from ..retrieval.interval_generation import (
     generate_chunk_intervals,
@@ -104,3 +105,62 @@ class FlightsPipeline:
             prefix="flight_v4_sample",
             skip_if_exists=skip_if_exists
         )
+
+    @staticmethod
+    def batch_flight_by_icao(icao_list: list, output_dir: str, batch_size: int = 50, skip_if_exists: bool = True):
+        """
+        Retrieve flight data for a large list of ICAO identifiers by batching them into queries,
+        each handling at most batch_size ICAO identifiers. Each batch is executed as a separate SQL query using
+        FlightQueries.get_flight_data_by_icao and the resulting data is saved to a separate parquet file
+        in the output directory.
+
+        Args:
+            icao_list (list): List of ICAO identifiers.
+            output_dir (str): Directory where the parquet files will be saved.
+            batch_size (int): Maximum number of ICAO identifiers per batch query. Defaults to 50.
+            skip_if_exists (bool): If True, skip the batch if the output file already exists.
+        """
+        import os
+        from pyopensky.trino import Trino
+
+        # Ensure the output directory exists.
+        os.makedirs(output_dir, exist_ok=True)
+
+        total_icaos = len(icao_list)
+        total_batches = (total_icaos + batch_size - 1) // batch_size
+        print(f"[INFO] Processing {total_icaos} ICAOs in {total_batches} batches (up to {batch_size} per batch).")
+
+        trino = Trino()
+        trino.debug = True  # Enable debug mode if needed
+
+        for batch_index in range(total_batches):
+            start_index = batch_index * batch_size
+            end_index = min(start_index + batch_size, total_icaos)
+            batch_icaos = icao_list[start_index:end_index]
+
+            output_file = os.path.join(output_dir, f"flight_by_icao_batch_{batch_index}.parquet")
+            if skip_if_exists and os.path.exists(output_file):
+                print(f"[INFO] Skipping batch {batch_index} (output file {output_file} already exists).")
+                continue
+
+            print(f"[INFO] Processing batch {batch_index+1}/{total_batches}: ICAOs {start_index} to {end_index-1}")
+
+            # Generate the SQL query for the current batch.
+            query = FlightQueries.get_flight_data_by_icao(batch_icaos)
+            print(f"[DEBUG] Executing query for batch {batch_index+1}:\n{query}")
+
+            try:
+                df = trino.query(query)
+                if df is None:
+                    print(f"[WARNING] Batch {batch_index+1}: Query returned None, skipping batch.")
+                    continue
+            except Exception as e:
+                print(f"[ERROR] Failed to execute query for batch {batch_index+1}: {e}")
+                continue
+
+            try:
+                # Save the DataFrame to a parquet file without the index.
+                df.to_parquet(output_file, index=False)
+                print(f"[SUCCESS] Batch {batch_index+1}: Saved {len(df)} rows to {output_file}")
+            except Exception as e:
+                print(f"[ERROR] Failed to save output for batch {batch_index+1}: {e}")
