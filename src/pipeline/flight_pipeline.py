@@ -107,36 +107,35 @@ class FlightsPipeline:
         )
 
     @staticmethod
-    def batch_flight_by_icao(icao_list: list, output_dir: str, batch_size: int = 50, skip_if_exists: bool = True):
+    def batch_flight_by_icao(icao_date_list: list, output_dir: str, batch_size: int = 100, skip_if_exists: bool = True):
         """
-        Retrieve flight data for a large list of ICAO identifiers by batching them into queries,
-        each handling at most batch_size ICAO identifiers. Each batch is executed as a separate SQL query using
-        FlightQueries.get_flight_data_by_icao and the resulting data is saved to a separate parquet file
-        in the output directory.
+        Retrieve flight data for a large list of ICAO identifiers and their associated dates by batching them into queries.
+        Each batch handles at most batch_size ICAO identifiers and computes the appropriate time range with buffer.
 
         Args:
-            icao_list (list): List of ICAO identifiers.
+            icao_date_list (list): List of tuples containing (icao, date) pairs.
             output_dir (str): Directory where the parquet files will be saved.
-            batch_size (int): Maximum number of ICAO identifiers per batch query. Defaults to 50.
+            batch_size (int): Maximum number of ICAO identifiers per batch query. Defaults to 100.
             skip_if_exists (bool): If True, skip the batch if the output file already exists.
         """
         import os
+        from datetime import datetime, timedelta
         from pyopensky.trino import Trino
 
         # Ensure the output directory exists.
         os.makedirs(output_dir, exist_ok=True)
 
-        total_icaos = len(icao_list)
+        total_icaos = len(icao_date_list)
         total_batches = (total_icaos + batch_size - 1) // batch_size
         print(f"[INFO] Processing {total_icaos} ICAOs in {total_batches} batches (up to {batch_size} per batch).")
 
         trino = Trino()
-        trino.debug = True  # Enable debug mode if needed
+        trino.debug = True
 
         for batch_index in range(total_batches):
             start_index = batch_index * batch_size
             end_index = min(start_index + batch_size, total_icaos)
-            batch_icaos = icao_list[start_index:end_index]
+            batch_data = icao_date_list[start_index:end_index]
 
             output_file = os.path.join(output_dir, f"flight_by_icao_batch_{batch_index}.parquet")
             if skip_if_exists and os.path.exists(output_file):
@@ -145,8 +144,21 @@ class FlightsPipeline:
 
             print(f"[INFO] Processing batch {batch_index+1}/{total_batches}: ICAOs {start_index} to {end_index-1}")
 
-            # Generate the SQL query for the current batch.
-            query = FlightQueries.get_flight_data_by_icao(batch_icaos)
+            # Extract ICAO numbers and compute time range for this batch
+            batch_icaos = [item[0] for item in batch_data]
+            
+            # Convert dates and add buffer
+            base_min_time = min(datetime.fromisoformat(item[1]) for item in batch_data)
+            base_max_time = max(datetime.fromisoformat(item[1]) for item in batch_data)
+            
+            # Add 3-hour buffer before and after
+            min_time = int((base_min_time - timedelta(hours=3)).timestamp())
+            max_time = int((base_max_time + timedelta(hours=8)).timestamp())
+
+            print(f"[INFO] Time range for batch {batch_index+1}: {min_time} to {max_time}")
+
+            # Generate the SQL query for the current batch with time range
+            query = FlightQueries.get_flight_data_by_icao(batch_icaos, time_range=(min_time, max_time))
             print(f"[DEBUG] Executing query for batch {batch_index+1}:\n{query}")
 
             try:

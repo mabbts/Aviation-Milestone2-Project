@@ -27,7 +27,7 @@ def main():
     print(f"Found {len(parquet_files)} parquet files in {input_dir_path}")
 
     # Define chunk size (20 files per batch)
-    chunk_size = 20
+    chunk_size = 10
     chunks = [parquet_files[i:i + chunk_size] for i in range(0, len(parquet_files), chunk_size)]
     print(f"Processing data in {len(chunks)} chunks.")
 
@@ -36,7 +36,7 @@ def main():
     processed_dir.mkdir(parents=True, exist_ok=True)
 
     # Define whether to drop the 'track' column
-    drop_track = True
+    drop_track = False
 
     # Process each chunk separately.
     for idx, chunk in enumerate(chunks):
