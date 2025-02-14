@@ -32,7 +32,7 @@ def main():
     print(f"Processing data in {len(chunks)} chunks.")
 
     # Set processed output directory.
-    processed_dir = DATA_DIR / "processed"
+    processed_dir = DATA_DIR / "processed/global_flights"
     processed_dir.mkdir(parents=True, exist_ok=True)
 
     # Define whether to drop the 'track' column
