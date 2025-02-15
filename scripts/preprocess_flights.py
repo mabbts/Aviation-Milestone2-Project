@@ -52,6 +52,17 @@ def main():
         # Process the DataFrame to compute new track metrics.
         df_processed = preprocess_flight_data(df)
 
+        # Convert timestamp columns to proper datetime format
+        timestamp_columns = ['firstseen', 'lastseen', 'time_min', 'time_max', 'time_avg', 'start_time', 'end_time']
+        
+        for col in timestamp_columns:
+            if col in df_processed.columns:
+                if col in ['start_time', 'end_time']:
+                    df_processed[col] = pd.to_datetime(df_processed[col]).astype('datetime64[ms]')
+                else:
+                    # Convert unix timestamps to datetime
+                    df_processed[col] = pd.to_datetime(df_processed[col], unit='s').astype('datetime64[ms]')
+
         # Optionally, drop the original 'track' column if no longer needed.
         if drop_track and "track" in df_processed.columns:
             df_processed.drop(columns=["track"], inplace=True)
