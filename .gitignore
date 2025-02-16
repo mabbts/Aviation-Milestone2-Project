@@ -11,3 +11,5 @@ test.py
 __pycache__/data_loader.cpython-310.pyc
 
 backup/
+
+notebooks/julien-hovan/model/
