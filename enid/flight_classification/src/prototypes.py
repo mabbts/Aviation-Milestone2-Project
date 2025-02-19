@@ -119,7 +119,7 @@ def calculate_dtw_distance(path1, path2, window=5):
 
 
 def classify_flight_path(path, speed_weight=2.0, altitude_weight=2.0):
-    """Classifies a flight path using weighted DTW."""
+    """Classifies a flight path using weighted DTW.""" 
     # Define prototype flight paths
     prototypes = {
         'Commercial Flight': commercial_prototype(),
