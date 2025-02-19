@@ -93,7 +93,8 @@ class LSTMPredictor(BasePredictor):
         num_layers=2,
         dropout=0.3,
         target_dim=7,
-        bidirectional=False
+        bidirectional=False,
+        l2_weight_decay=1e-4
     ):
         """
         LSTM-based predictor.
@@ -108,6 +109,7 @@ class LSTMPredictor(BasePredictor):
         super().__init__()
         self.bidirectional = bidirectional
         self.num_directions = 2 if bidirectional else 1
+        self.l2_weight_decay = l2_weight_decay
 
         self.lstm = nn.LSTM(
             input_size=input_dim,

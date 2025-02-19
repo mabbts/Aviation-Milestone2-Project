@@ -15,7 +15,12 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from config import PATHS, DATA, MODEL, TRAIN, INFERENCE
-from state_prediction.models import get_model  # Updated import
+
+# Add parent directory to path for model imports
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from models import get_model
 
 def generate_sequence(model, initial_sequence, y_scaler, num_predictions=None, device=None):
     """
@@ -64,9 +69,21 @@ def main():
     test_loader  = DataLoader(test_dataset, batch_size=TRAIN.batch_size, shuffle=False)
 
     # 3. Load model (using the factory)
-    model_config = vars(MODEL).copy()
-    model_type = model_config.pop("model_type", "transformer")
-    model = get_model(model_type, **model_config).to(device)
+    # Build model parameters based on the model type
+    if MODEL.model_type.lower() == "transformer":
+        model_params = {
+            "input_dim": MODEL.input_dim,
+            **vars(MODEL.transformer)
+        }
+    elif MODEL.model_type.lower() == "lstm":
+        model_params = {
+            "input_dim": MODEL.input_dim,
+            **vars(MODEL.lstm)
+        }
+    else:
+        raise ValueError(f"Unknown model type: {MODEL.model_type}")
+    
+    model = get_model(MODEL.model_type, **model_params).to(device)
     model.load_state_dict(torch.load(PATHS.model_dir / TRAIN.model_filename, map_location=device))
     model.eval()
 

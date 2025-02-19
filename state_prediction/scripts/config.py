@@ -40,10 +40,9 @@ class DataConfig:
         ]
     )
 
+# Transformer-specific configuration.
 @dataclass
-class ModelConfig:
-    model_type: str = "transformer"  # Added field for factory selection
-    input_dim: int = 7
+class TransformerConfig:
     d_model: int = 256
     nhead: int = 8
     num_encoder_layers: int = 6
@@ -52,16 +51,48 @@ class ModelConfig:
     dropout: float = 0.3
     target_dim: int = 7
 
+# LSTM-specific configuration.
+@dataclass
+class LSTMConfig:
+    hidden_dim: int = 128
+    num_layers: int = 2
+    dropout: float = 0.3
+
+    # additional parameters
+    l2_weight_decay: float = 1e-4
+    bidirectional: bool = False
+
+
+    # output dimensions
+    target_dim: int = 7
+
+# General model parameters: common parameters and nested model-specific configurations
+@dataclass
+class ModelConfig:
+    model_type: str = "lstm"  # Options: "transformer" or "lstm"
+    input_dim: int = 7  # Common to both models
+    transformer: TransformerConfig = TransformerConfig()
+    lstm: LSTMConfig = LSTMConfig()
+
 @dataclass 
 class TrainingConfig:
-    # From train.py
-    batch_size: int = 32
-    num_epochs: int = 50
+    batch_size: int = 64         # Increased from 32
+    num_epochs: int = 100
     learning_rate: float = 1e-3
     optimizer: str = 'adam'
     save_model: bool = True
-    model_filename: str = 'best_model.pth'
+    model_filename: str = 'lstm_best_model.pth'
     device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
+    
+    # Early stopping parameters
+    patience: int = 10           # Number of epochs to wait for improvement
+    min_delta: float = 1e-4      # Minimum change to qualify as an improvement
+    
+    # Learning rate scheduling
+    use_lr_scheduler: bool = True
+    lr_patience: int = 5
+    lr_factor: float = 0.5
+    min_lr: float = 1e-6
 
 @dataclass
 class InferenceConfig:
