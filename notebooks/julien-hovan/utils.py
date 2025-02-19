@@ -2,6 +2,8 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+
+
 def resample_flight_state_data(df, interval='5s'):
     """
     Resample flight state vector data to a specified time interval.
@@ -23,8 +25,9 @@ def resample_flight_state_data(df, interval='5s'):
     # Create a copy to avoid modifying the original data
     df_copy = df.copy()
     
-    # Convert Unix timestamps to pandas datetime objects
-    df_copy['time'] = pd.to_datetime(df_copy['time'], unit='s')
+    # Convert Unix timestamps to pandas datetime objects if needed
+    if df_copy['time'].dtype != 'datetime64[ns]':
+        df_copy['time'] = pd.to_datetime(df_copy['time'], unit='s')
     
     # Ensure data is sorted chronologically
     df_copy = df_copy.sort_values('time')
@@ -32,11 +35,21 @@ def resample_flight_state_data(df, interval='5s'):
     # Set time as index for resampling
     df_copy.set_index('time', inplace=True)
     
-    # Resample data:
-    # - Creates new rows at regular intervals specified by 'interval'
-    # - Takes the first observation in each interval
-    # - Resets index to make time a regular column again
-    resampled_df = df_copy.resample(interval).first().reset_index()
+    # Store original column order
+    original_columns = df_copy.columns.tolist()
+    
+    # Resample data and forward fill missing values
+    resampled_df = df_copy.resample(interval).first()
+    
+    # Reset index to make time a regular column again
+    resampled_df.reset_index(inplace=True)
+    
+    # Ensure all original columns are present in the same order
+    for col in original_columns:
+        if col not in resampled_df.columns:
+            resampled_df[col] = None
+            
+    resampled_df = resampled_df[['time'] + original_columns]
     
     return resampled_df
 
