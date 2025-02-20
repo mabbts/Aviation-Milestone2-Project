@@ -54,8 +54,8 @@ class TransformerConfig:
 # LSTM-specific configuration.
 @dataclass
 class LSTMConfig:
-    hidden_dim: int = 128
-    num_layers: int = 2
+    hidden_dim: int = 256
+    num_layers: int = 3
     dropout: float = 0.3
 
     # additional parameters
@@ -66,13 +66,28 @@ class LSTMConfig:
     # output dimensions
     target_dim: int = 7
 
+# FFNN-specific configuration
+@dataclass
+class FFNNConfig:
+    hidden_dims: list = field(
+        default_factory=lambda: [512, 256, 128]
+    )
+    dropout: float = 0.3
+    target_dim: int = 7
+
 # General model parameters: common parameters and nested model-specific configurations
 @dataclass
 class ModelConfig:
-    model_type: str = "lstm"  # Options: "transformer" or "lstm"
-    input_dim: int = 7  # Common to both models
+    model_type: str = "ffnn"  # Options: "transformer", "lstm", or "ffnn"
+    input_dim: int = 7  # Common to all models
     transformer: TransformerConfig = TransformerConfig()
     lstm: LSTMConfig = LSTMConfig()
+    ffnn: FFNNConfig = FFNNConfig()
+
+    @property
+    def model_filename(self) -> str:
+        """Dynamically generate model filename based on model type."""
+        return f"{self.model_type.lower()}_best_model.pth"
 
 @dataclass 
 class TrainingConfig:
@@ -81,7 +96,6 @@ class TrainingConfig:
     learning_rate: float = 1e-3
     optimizer: str = 'adam'
     save_model: bool = True
-    model_filename: str = 'lstm_best_model.pth'
     device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     # Early stopping parameters

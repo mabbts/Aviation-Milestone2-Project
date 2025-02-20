@@ -80,6 +80,11 @@ def main():
             "input_dim": MODEL.input_dim,
             **vars(MODEL.lstm)
         }
+    elif MODEL.model_type.lower() == "ffnn":
+        model_params = {
+            "input_dim": MODEL.input_dim,
+            **vars(MODEL.ffnn)
+        }
     else:
         raise ValueError(f"Unknown model type: {MODEL.model_type}")
     
@@ -159,7 +164,7 @@ def main():
             # Save best model
             if TRAIN.save_model:
                 torch.save(model.state_dict(), 
-                         PATHS.model_dir / TRAIN.model_filename)
+                         PATHS.model_dir / MODEL.model_filename)
         else:
             patience_counter += 1
             
@@ -183,7 +188,7 @@ def main():
     plt.savefig(PATHS.model_dir / "training_loss_plot.png")
 
     print("[INFO] Training completed. Best test loss:", best_val_loss)
-    print(f"[INFO] Best model saved as '{TRAIN.model_filename}' in 'model/' folder.")
+    print(f"[INFO] Best model saved as '{MODEL.model_filename}' in 'model/' folder.")
 
 if __name__ == "__main__":
     main()

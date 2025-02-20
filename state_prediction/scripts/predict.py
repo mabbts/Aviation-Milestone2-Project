@@ -80,11 +80,16 @@ def main():
             "input_dim": MODEL.input_dim,
             **vars(MODEL.lstm)
         }
+    elif MODEL.model_type.lower() == "ffnn":
+        model_params = {
+            "input_dim": MODEL.input_dim,
+            **vars(MODEL.ffnn)
+        }
     else:
         raise ValueError(f"Unknown model type: {MODEL.model_type}")
     
     model = get_model(MODEL.model_type, **model_params).to(device)
-    model.load_state_dict(torch.load(PATHS.model_dir / TRAIN.model_filename, map_location=device))
+    model.load_state_dict(torch.load(PATHS.model_dir / MODEL.model_filename, map_location=device))
     model.eval()
 
     criterion = nn.MSELoss()

@@ -136,6 +136,63 @@ class LSTMPredictor(BasePredictor):
         return out
 
 
+class FFNNPredictor(BasePredictor):
+    def __init__(
+        self,
+        input_dim=7,
+        seq_len=29,  # Updated to match your actual sequence length (203/7 ≈ 29)
+        hidden_dims=[512, 256, 128],
+        dropout=0.3,
+        target_dim=7
+    ):
+        """
+        Simple Feed-Forward Neural Network predictor.
+        Args:
+            input_dim (int): Number of features in the input
+            seq_len (int): Length of input sequence
+            hidden_dims (list): List of hidden layer dimensions
+            dropout (float): Dropout rate between layers
+            target_dim (int): Dimension of the output prediction
+        """
+        super().__init__()
+        
+        # Calculate flattened input size
+        self.flat_input_size = input_dim * seq_len
+        
+        # Create list of layer dimensions
+        layer_dims = [self.flat_input_size] + hidden_dims
+        
+        # Build multi-layer perceptron
+        layers = []
+        for i in range(len(layer_dims)-1):
+            layers.extend([
+                nn.Linear(layer_dims[i], layer_dims[i+1]),
+                nn.ReLU(),
+                nn.Dropout(dropout)
+            ])
+        
+        # Add final output layer
+        layers.append(nn.Linear(layer_dims[-1], target_dim))
+        
+        self.model = nn.Sequential(*layers)
+
+    def forward(self, x):
+        """
+        x shape: (batch_size, seq_len, input_dim)
+        Returns: (batch_size, target_dim)
+        """
+        batch_size = x.size(0)
+        # Add shape validation
+        expected_features = x.size(1) * x.size(2)
+        if expected_features != self.flat_input_size:
+            raise ValueError(f"Input shape mismatch. Expected {self.flat_input_size} features when flattened, but got {expected_features}. "
+                           f"Input shape: {x.shape}")
+        
+        # Flatten the input sequence
+        x_flat = x.reshape(batch_size, -1)
+        return self.model(x_flat)
+
+
 def get_model(model_type="transformer", **kwargs):
     """
     Factory method to get the desired model.
@@ -145,5 +202,7 @@ def get_model(model_type="transformer", **kwargs):
         return TransformerPredictor(**kwargs)
     elif model_type.lower() == "lstm":
         return LSTMPredictor(**kwargs)
+    elif model_type.lower() == "ffnn":
+        return FFNNPredictor(**kwargs)
     else:
         raise ValueError(f"Model type '{model_type}' not recognized.") 
