@@ -44,25 +44,24 @@ class DataConfig:
 @dataclass
 class TransformerConfig:
     d_model: int = 256
-    nhead: int = 8
+    nhead: int = 4
     num_encoder_layers: int = 6
     num_decoder_layers: int = 1
-    dim_feedforward: int = 1024
+    dim_feedforward: int = 512
     dropout: float = 0.3
     target_dim: int = 7
 
 # LSTM-specific configuration.
 @dataclass
 class LSTMConfig:
+    # width and height of the LSTM
     hidden_dim: int = 256
     num_layers: int = 3
+    # regularization parameter
     dropout: float = 0.3
-
-    # additional parameters
     l2_weight_decay: float = 1e-4
+    # additional parameters
     bidirectional: bool = False
-
-
     # output dimensions
     target_dim: int = 7
 
@@ -78,7 +77,7 @@ class FFNNConfig:
 # General model parameters: common parameters and nested model-specific configurations
 @dataclass
 class ModelConfig:
-    model_type: str = "ffnn"  # Options: "transformer", "lstm", or "ffnn"
+    model_type: str = "transformer"  # Options: "transformer", "lstm", or "ffnn"
     input_dim: int = 7  # Common to all models
     transformer: TransformerConfig = TransformerConfig()
     lstm: LSTMConfig = LSTMConfig()

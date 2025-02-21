@@ -185,7 +185,7 @@ def main():
     plt.legend()
     plt.yscale("log")
     plt.title(f"{MODEL.model_type.capitalize()} Training Losses")
-    plt.savefig(PATHS.model_dir / "training_loss_plot.png")
+    plt.savefig(PATHS.model_dir / f"{MODEL.model_type}_training_loss_plot.png")
 
     print("[INFO] Training completed. Best test loss:", best_val_loss)
     print(f"[INFO] Best model saved as '{MODEL.model_filename}' in 'model/' folder.")

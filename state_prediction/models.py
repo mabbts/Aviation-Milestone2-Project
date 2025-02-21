@@ -2,8 +2,21 @@ import torch
 import torch.nn as nn
 import numpy as np
 
+# --------------------------------------------------------------------------------------
+# Positional Encoding for Transformer
+# --------------------------------------------------------------------------------------
 class PositionalEncoding(nn.Module):
+    """
+    Positional encoding layer that adds positional information to input embeddings.
+    This helps the transformer model understand the order of the sequence.
+    """
     def __init__(self, d_model, dropout=0.1, max_len=5000):
+        """
+        Args:
+            d_model (int): The embedding dimension
+            dropout (float): Dropout rate
+            max_len (int): Maximum sequence length to pre-compute encodings for
+        """
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
         # Create a long enough P.E. matrix
@@ -17,20 +30,34 @@ class PositionalEncoding(nn.Module):
 
     def forward(self, x):
         """
-        x shape: (batch_size, seq_len, d_model)
+        Args:
+            x (Tensor): Input tensor of shape (batch_size, seq_len, d_model)
+        Returns:
+            Tensor: Input with positional encoding added
         """
         seq_len = x.size(1)
         x = x + self.pe[:, :seq_len, :]
         return self.dropout(x)
 
-
-# Base class for predictors. In the future, other models can inherit from this.
+# --------------------------------------------------------------------------------------
+# Base Predictor Class
+# --------------------------------------------------------------------------------------
 class BasePredictor(nn.Module):
+    """
+    Base class that all predictors should inherit from.
+    Provides a common interface for all models.
+    """
     def forward(self, x):
         raise NotImplementedError("Subclasses must implement this method.")
 
-
+# --------------------------------------------------------------------------------------
+# Transformer Predictor
+# --------------------------------------------------------------------------------------
 class TransformerPredictor(BasePredictor):
+    """
+    Transformer-based sequence predictor that uses encoder-decoder architecture.
+    Particularly effective for capturing long-range dependencies in sequential data.
+    """
     def __init__(
         self, 
         input_dim=7, 
@@ -42,6 +69,17 @@ class TransformerPredictor(BasePredictor):
         dropout=0.3, 
         target_dim=7
     ):
+        """
+        Args:
+            input_dim (int): Number of input features
+            d_model (int): Dimension of the model's internal representations
+            nhead (int): Number of attention heads
+            num_encoder_layers (int): Number of transformer encoder layers
+            num_decoder_layers (int): Number of transformer decoder layers
+            dim_feedforward (int): Dimension of feedforward network
+            dropout (float): Dropout rate
+            target_dim (int): Dimension of output predictions
+        """
         super().__init__()
         self.input_proj = nn.Linear(input_dim, d_model)
         self.pos_encoder = PositionalEncoding(d_model, dropout=dropout)
@@ -72,8 +110,12 @@ class TransformerPredictor(BasePredictor):
 
     def forward(self, x):
         """
-        x shape: (batch_size, seq_len, input_dim)
-        Returns: (batch_size, target_dim)
+        Forward pass of the transformer predictor.
+        
+        Args:
+            x (Tensor): Input tensor of shape (batch_size, seq_len, input_dim)
+        Returns:
+            Tensor: Predictions of shape (batch_size, target_dim)
         """
         batch_size = x.size(0)
         x = self.input_proj(x)
@@ -84,8 +126,14 @@ class TransformerPredictor(BasePredictor):
         out = self.fc_out(decoded.squeeze(1))
         return out
 
-
+# --------------------------------------------------------------------------------------
+# LSTM Predictor
+# --------------------------------------------------------------------------------------
 class LSTMPredictor(BasePredictor):
+    """
+    LSTM-based sequence predictor.
+    Effective for capturing temporal dependencies and maintaining long-term memory.
+    """
     def __init__(
         self,
         input_dim=7,
@@ -97,14 +145,14 @@ class LSTMPredictor(BasePredictor):
         l2_weight_decay=1e-4
     ):
         """
-        LSTM-based predictor.
         Args:
-            input_dim (int): Number of features in the input.
-            hidden_dim (int): Hidden dimension of the LSTM.
-            num_layers (int): Number of LSTM layers.
-            dropout (float): Dropout to apply between LSTM layers.
-            target_dim (int): Dimension of the output prediction.
-            bidirectional (bool): If True, use a bidirectional LSTM.
+            input_dim (int): Number of input features
+            hidden_dim (int): Size of LSTM hidden state
+            num_layers (int): Number of stacked LSTM layers
+            dropout (float): Dropout rate between LSTM layers
+            target_dim (int): Dimension of output predictions
+            bidirectional (bool): Whether to use bidirectional LSTM
+            l2_weight_decay (float): L2 regularization strength
         """
         super().__init__()
         self.bidirectional = bidirectional
@@ -123,43 +171,45 @@ class LSTMPredictor(BasePredictor):
 
     def forward(self, x):
         """
-        x shape: (batch_size, seq_len, input_dim)
-        Returns: (batch_size, target_dim)
+        Forward pass of the LSTM predictor.
+        
+        Args:
+            x (Tensor): Input tensor of shape (batch_size, seq_len, input_dim)
+        Returns:
+            Tensor: Predictions of shape (batch_size, target_dim)
         """
-        # LSTM returns outputs for all time-steps; we take the last time-step.
         lstm_out, (h_n, c_n) = self.lstm(x)
-        # If bidirectional, h_n contains the last hidden state for both directions.
-        # You can either concatenate them or use the output from the last time-step.
-        # Here, we take the output at the final time-step:
         last_output = lstm_out[:, -1, :]
         out = self.fc(last_output)
         return out
 
-
+# --------------------------------------------------------------------------------------
+# Feed-Forward Neural Network Predictor
+# --------------------------------------------------------------------------------------
 class FFNNPredictor(BasePredictor):
+    """
+    Simple Feed-Forward Neural Network predictor.
+    Flattens the input sequence and processes it through multiple fully connected layers.
+    """
     def __init__(
         self,
         input_dim=7,
-        seq_len=29,  # Updated to match your actual sequence length (203/7 ≈ 29)
+        seq_len=29,
         hidden_dims=[512, 256, 128],
         dropout=0.3,
         target_dim=7
     ):
         """
-        Simple Feed-Forward Neural Network predictor.
         Args:
-            input_dim (int): Number of features in the input
+            input_dim (int): Number of input features
             seq_len (int): Length of input sequence
-            hidden_dims (list): List of hidden layer dimensions
+            hidden_dims (list): Dimensions of hidden layers
             dropout (float): Dropout rate between layers
-            target_dim (int): Dimension of the output prediction
+            target_dim (int): Dimension of output predictions
         """
         super().__init__()
         
-        # Calculate flattened input size
         self.flat_input_size = input_dim * seq_len
-        
-        # Create list of layer dimensions
         layer_dims = [self.flat_input_size] + hidden_dims
         
         # Build multi-layer perceptron
@@ -171,32 +221,43 @@ class FFNNPredictor(BasePredictor):
                 nn.Dropout(dropout)
             ])
         
-        # Add final output layer
         layers.append(nn.Linear(layer_dims[-1], target_dim))
-        
         self.model = nn.Sequential(*layers)
 
     def forward(self, x):
         """
-        x shape: (batch_size, seq_len, input_dim)
-        Returns: (batch_size, target_dim)
+        Forward pass of the FFNN predictor.
+        
+        Args:
+            x (Tensor): Input tensor of shape (batch_size, seq_len, input_dim)
+        Returns:
+            Tensor: Predictions of shape (batch_size, target_dim)
         """
         batch_size = x.size(0)
-        # Add shape validation
         expected_features = x.size(1) * x.size(2)
         if expected_features != self.flat_input_size:
             raise ValueError(f"Input shape mismatch. Expected {self.flat_input_size} features when flattened, but got {expected_features}. "
                            f"Input shape: {x.shape}")
         
-        # Flatten the input sequence
         x_flat = x.reshape(batch_size, -1)
         return self.model(x_flat)
 
-
+# --------------------------------------------------------------------------------------
+# Model Factory
+# --------------------------------------------------------------------------------------
 def get_model(model_type="transformer", **kwargs):
     """
-    Factory method to get the desired model.
-    To add a new model, implement the new class and update this function.
+    Factory function to instantiate the appropriate model type.
+    
+    Args:
+        model_type (str): Type of model to create ("transformer", "lstm", or "ffnn")
+        **kwargs: Model-specific parameters
+    
+    Returns:
+        BasePredictor: Instantiated model of the requested type
+        
+    Raises:
+        ValueError: If model_type is not recognized
     """
     if model_type.lower() == "transformer":
         return TransformerPredictor(**kwargs)
