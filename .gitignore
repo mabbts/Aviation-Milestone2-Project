@@ -16,3 +16,4 @@ state_prediction/model/
 *.zip
 
 julien_data/
+data/

@@ -15,8 +15,8 @@ from src.utils.paths import DATA_DIR
 StateVectorPipeline.sample_state_vectors(
     start_date="2024-01-01 12:00:00",
     end_date="2024-12-31 15:00:00",
-    output_dir=DATA_DIR / "raw/state_vectors_samples",
+    output_dir=DATA_DIR / "raw/enid_data",
     n_samples=15,
-    interval_hours=3,
+    interval_hours=6,
     skip_if_exists=True
-)
+)   
