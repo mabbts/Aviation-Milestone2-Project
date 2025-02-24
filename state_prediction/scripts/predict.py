@@ -48,6 +48,38 @@ def generate_sequence(model, initial_sequence, y_scaler, num_predictions=None, d
     predictions_unscaled = y_scaler.inverse_transform(predictions)
     return predictions_unscaled
 
+def plot_trajectories(actual_sequences, predicted_sequences, save_path):
+    """
+    Creates a spaghetti plot of multiple actual and predicted trajectories
+    
+    Args:
+        actual_sequences: List of actual trajectory sequences (n_sequences, seq_len, features)
+        predicted_sequences: List of predicted trajectory sequences (n_sequences, pred_len, features)
+        save_path: Path to save the plot
+    """
+    plt.figure(figsize=(12, 10))
+    
+    # Plot actual trajectories in light gray
+    for seq in actual_sequences:
+        plt.plot(seq[:, 0], seq[:, 1], 'gray', alpha=0.3, linewidth=1, label='_nolegend_')
+    
+    # Plot predicted trajectories
+    for i, (actual, pred) in enumerate(zip(actual_sequences, predicted_sequences)):
+        # Combine the last point of actual with prediction for continuity
+        full_pred = np.vstack([actual[-1:], pred])
+        plt.plot(full_pred[:, 0], full_pred[:, 1], 'b-', alpha=0.6, linewidth=1.5, label='Predicted' if i == 0 else '_nolegend_')
+        plt.plot(actual[-1, 0], actual[-1, 1], 'go', markersize=6, label='Start Point' if i == 0 else '_nolegend_')
+        plt.plot(pred[-1, 0], pred[-1, 1], 'ro', markersize=6, label='End Point' if i == 0 else '_nolegend_')
+
+    plt.xlabel('Longitude')
+    plt.ylabel('Latitude')
+    plt.title('Multiple Flight Trajectory Predictions')
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    print("[INFO] Saved multiple flight paths plot to:", save_path)
+
 def main():
     device = torch.device(TRAIN.device)
     print("[INFO] Using device:", device)
@@ -102,6 +134,36 @@ def main():
             total_test_loss += loss.item()
     avg_test_loss = total_test_loss / len(test_loader)
     print(f"[INFO] Test Loss: {avg_test_loss:.6f}")
+
+    # Generate predictions for multiple sequences
+    num_sequences = 10  # Number of trajectories to plot
+    sequence_indices = np.random.choice(len(X_test), num_sequences, replace=False)
+    
+    actual_sequences = []
+    predicted_sequences = []
+    
+    for idx in sequence_indices:
+        # Get the actual sequence (unscaled)
+        actual_seq = X_scaler.inverse_transform(X_test[idx])
+        actual_sequences.append(actual_seq)
+        
+        # Generate prediction with 200 steps
+        sample_input = X_test_t[idx:idx+1]
+        gen_sequence = generate_sequence(
+            model,
+            sample_input,
+            y_scaler,
+            num_predictions=200,  # Changed to generate 200 steps
+            device=device
+        )
+        predicted_sequences.append(gen_sequence)
+
+    # Create the spaghetti plot
+    plot_trajectories(
+        actual_sequences,
+        predicted_sequences,
+        PATHS.model_dir / "multiple_flight_paths.png"
+    )
 
     sample_input = X_test_t[0:1]
     prediction  = model(sample_input)

@@ -24,6 +24,8 @@ INTERPOLATE_COLUMNS = ['lat', 'lon', 'velocity', 'vertrate', 'heading', 'geoalti
 # Final processed output columns (dropping 'time'):
 FINAL_COLUMNS = ['icao24', 'lat', 'lon', 'velocity', 'vertrate', 'heading', 'geoaltitude']
 
+# Add this constant near the top with other constants
+TIME_GAP_THRESHOLD_SECONDS = 25 * 60  # 25 minutes in seconds
 
 def load_data(input_dir: Path) -> pl.LazyFrame:
     """
@@ -39,32 +41,56 @@ def load_data(input_dir: Path) -> pl.LazyFrame:
     return df
 
 
+def assign_flight_segments(df: pl.DataFrame) -> pl.DataFrame:
+    """
+    Assigns a flight_id based on time gaps. A new flight is started
+    if the time difference between consecutive records exceeds the threshold.
+    """
+    return (
+        df.sort("time")
+          .with_columns([
+              (pl.col("time") - pl.col("time").shift(1) > TIME_GAP_THRESHOLD_SECONDS)
+              .fill_null(True)
+              .alias("new_flight_flag")
+          ])
+          .with_columns([
+              pl.col("new_flight_flag").cumsum().alias("flight_id")
+          ])
+          .drop("new_flight_flag")
+    )
+
+
 def process_data(df: pl.LazyFrame) -> pl.LazyFrame:
     """
     Process the state vector data using Polars operations:
     - Selects only the required columns
     - Drops rows missing 'icao24' or 'time'
-    - Groups by icao24 and interpolates missing numeric values
+    - Groups by icao24 and flight_id and interpolates missing numeric values
     - Drops any remaining missing values in the numeric columns
     - Explodes interpolated arrays back into rows
     """
     return (df
-        # Select only necessary columns
         .select(COLUMNS_TO_KEEP)
-        # Drop nulls in key columns
         .drop_nulls(['icao24', 'time'])
-        # Sort by icao24 and time for interpolation
-        .sort(['icao24', 'time'])
-        # Group by icao24 and interpolate each numeric column
-        .group_by('icao24')
+        # Sort by time and create flight segments based on time gaps
+        .sort("time")
+        .with_columns([
+            (pl.col("time") - pl.col("time").shift(1) > TIME_GAP_THRESHOLD_SECONDS)
+            .over("icao24")
+            .fill_null(True)
+            .alias("new_flight_flag")
+        ])
+        .with_columns([
+            pl.col("new_flight_flag").cum_sum().over("icao24").alias("flight_id")
+        ])
+        .drop("new_flight_flag")
+        # Group by both icao24 and flight_id for interpolation
+        .group_by(['icao24', 'flight_id'])
         .agg([
             pl.col(col).interpolate() for col in INTERPOLATE_COLUMNS
         ])
-        # Explode all columns except icao24 to convert arrays back to rows
         .explode(INTERPOLATE_COLUMNS)
-        # Drop any remaining nulls in numeric columns
         .drop_nulls(INTERPOLATE_COLUMNS)
-        # Select final columns
         .select(FINAL_COLUMNS))
 
 

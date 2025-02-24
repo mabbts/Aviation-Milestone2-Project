@@ -44,11 +44,11 @@ class DataConfig:
 @dataclass
 class TransformerConfig:
     d_model: int = 256
-    nhead: int = 4
-    num_encoder_layers: int = 6
+    nhead: int = 8
+    num_encoder_layers: int = 5
     num_decoder_layers: int = 1
     dim_feedforward: int = 512
-    dropout: float = 0.3
+    dropout: float = 0.2
     target_dim: int = 7
 
 # LSTM-specific configuration.
