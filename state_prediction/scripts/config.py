@@ -134,6 +134,17 @@ class ModelConfig:
             }
         else:
             raise ValueError(f"Unknown model type: {self.model_type}")
+        
+    def get_model_dir(self, model_type):
+        """Get the directory for a specific model type"""
+        if model_type.lower() == "transformer":
+            return self.TRANSFORMER_MODEL_DIR
+        elif model_type.lower() == "lstm":
+            return self.LSTM_MODEL_DIR
+        elif model_type.lower() == "ffnn":
+            return self.FFNN_MODEL_DIR
+        else:
+            raise ValueError(f"Unknown model type: {model_type}")
 
 @dataclass 
 class TrainingConfig:

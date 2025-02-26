@@ -65,12 +65,18 @@ def main():
         f"{MODEL.model_type}_config": vars(getattr(MODEL, MODEL.model_type))
     }
     
+    # Get the model-specific directory
+    model_dir = PATHS.get_model_dir(MODEL.model_type)
+    
     # Create model directory if it doesn't exist
-    PATHS.model_dir.mkdir(parents=True, exist_ok=True)
+    model_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Create visualizations directory if it doesn't exist
+    vis_dir = model_dir / "visualizations"
+    os.makedirs(vis_dir, exist_ok=True)
     
     # Save configuration with model-specific name
-    config_path = PATHS.get_model_config_path(MODEL.model_type)
-    save_config(config_dict, PATHS.model_dir, MODEL.model_type)
+    save_config(config_dict, model_dir, MODEL.model_type)
     
     # Set up device (GPU if available, else CPU)
     device = torch.device(TRAIN.device)
@@ -223,10 +229,10 @@ def main():
     plt.legend()
     plt.yscale("log")
     plt.title(f"{MODEL.model_type.capitalize()} Training Losses")
-    plt.savefig(PATHS.get_loss_plot_path(MODEL.model_type))
+    plt.savefig(vis_dir / f"{MODEL.model_type}_training_loss.png")
 
     print("[INFO] Training completed. Best test loss:", best_val_loss)
-    print(f"[INFO] Best model saved as '{MODEL.model_filename}' in 'model/' folder.")
+    print(f"[INFO] Best model saved to '{model_dir}'.")
 
 if __name__ == "__main__":
     main()

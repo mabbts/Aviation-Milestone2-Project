@@ -20,10 +20,10 @@ import math
 import argparse
 import json
 import time
+import os
 
 # Add parent directory to path for model imports
 import sys
-import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models import get_model
 from config import PATHS, DATA, MODEL, TRAIN, INFERENCE, TransformerConfig, LSTMConfig, FFNNConfig
@@ -244,8 +244,12 @@ def main():
         std_value = np.std(values)
         print(f"  {metric}: {avg_value:.6f} ± {std_value:.6f}")
     
+    # Create visualizations directory if it doesn't exist
+    vis_dir = PATHS.model_dir / "visualizations"
+    os.makedirs(vis_dir, exist_ok=True)
+    
     # Plot metrics across folds
-    plot_metrics(fold_metrics, PATHS.model_dir / f"{args.model}_cv_metrics.png")
+    plot_metrics(fold_metrics, vis_dir / f"{args.model}_cv_metrics.png")
     
     # Also evaluate on test set for final validation
     X_test = np.load(PATHS.train_data_dir / 'X_test.npy')

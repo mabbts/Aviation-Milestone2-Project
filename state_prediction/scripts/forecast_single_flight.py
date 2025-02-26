@@ -368,6 +368,10 @@ def main():
     for metric, value in metrics.items():
         print(f"  {metric}: {value:.6f}")
     
+    # Create visualizations directory if it doesn't exist
+    vis_dir = PATHS.model_dir / "visualizations"
+    os.makedirs(vis_dir, exist_ok=True)
+    
     # 13. Plot comparison
     print("[INFO] Plotting comparison...")
     last_input_point = input_sequence[-1:].reshape(1, -1)
@@ -375,7 +379,7 @@ def main():
         actual_path,
         predictions,
         last_input_point,
-        PATHS.model_dir / f"single_flight_forecast_{args.model}.png"
+        vis_dir / f"single_flight_forecast_{args.model}.png"
     )
     
     # 14. Save the results

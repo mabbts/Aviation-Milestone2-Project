@@ -179,6 +179,10 @@ def main():
     avg_test_loss = total_test_loss / len(test_loader)
     print(f"[INFO] Test Loss: {avg_test_loss:.6f}")
 
+    # Create visualizations directory if it doesn't exist
+    vis_dir = PATHS.model_dir / "visualizations"
+    os.makedirs(vis_dir, exist_ok=True)
+    
     # Generate predictions for multiple sequences
     num_sequences = 10  # Number of trajectories to plot
     sequence_indices = np.random.choice(len(X_test), num_sequences, replace=False)
@@ -206,7 +210,7 @@ def main():
     plot_trajectories(
         actual_sequences,
         predicted_sequences,
-        PATHS.model_dir / "multiple_flight_paths.png"
+        vis_dir / "multiple_flight_paths.png"
     )
 
     sample_input = X_test_t[0:1]
@@ -249,8 +253,8 @@ def main():
     plt.grid(True)  
     plt.legend()
     
-    plt.savefig(PATHS.model_dir / "predicted_flight_path.png", dpi=300, bbox_inches='tight')
-    print("[INFO] Saved predicted flight path plot to:", PATHS.model_dir / "predicted_flight_path.png")
+    plt.savefig(vis_dir / "predicted_flight_path.png", dpi=300, bbox_inches='tight')
+    print("[INFO] Saved predicted flight path plot to:", vis_dir / "predicted_flight_path.png")
 
 if __name__ == "__main__":
     main()
