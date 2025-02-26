@@ -21,6 +21,8 @@ import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend for plotting
 import matplotlib.pyplot as plt
 import pickle
+import argparse
+import json
 
 import torch
 import torch.nn as nn
@@ -36,8 +38,40 @@ from models import get_model
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
+def parse_args():
+    parser = argparse.ArgumentParser(description='Train state prediction model')
+    parser.add_argument('--model', type=str, choices=['transformer', 'lstm', 'ffnn', 'kalman'],
+                       default='transformer', help='Model architecture to use')
+    return parser.parse_args()
+
+def save_config(config_dict, model_dir, model_type):
+    """Save model configuration to JSON file"""
+    config_path = model_dir / f"{model_type}_config.json"
+    with open(config_path, 'w') as f:
+        json.dump(config_dict, f, indent=4)
+    print(f"[INFO] Saved {model_type} configuration to {config_path}")
+
 def main():
-    """Main training function that orchestrates the model training process."""
+    # Parse command line arguments
+    args = parse_args()
+    
+    # Update model type in config
+    MODEL.model_type = args.model
+    
+    # Create config dictionary to save
+    config_dict = {
+        "model_type": MODEL.model_type,
+        "input_dim": MODEL.input_dim,
+        f"{MODEL.model_type}_config": vars(getattr(MODEL, MODEL.model_type))
+    }
+    
+    # Create model directory if it doesn't exist
+    PATHS.model_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Save configuration with model-specific name
+    config_path = PATHS.get_model_config_path(MODEL.model_type)
+    save_config(config_dict, PATHS.model_dir, MODEL.model_type)
+    
     # Set up device (GPU if available, else CPU)
     device = torch.device(TRAIN.device)
     print(f"[INFO] Using device: {device}")
@@ -84,6 +118,11 @@ def main():
         model_params = {
             "input_dim": MODEL.input_dim,
             **vars(MODEL.ffnn)
+        }
+    elif MODEL.model_type.lower() == "kalman":
+        model_params = {
+            "input_dim": MODEL.input_dim,
+            **vars(MODEL.kalman)
         }
     else:
         raise ValueError(f"Unknown model type: {MODEL.model_type}")
@@ -163,8 +202,7 @@ def main():
             patience_counter = 0
             # Save best model
             if TRAIN.save_model:
-                torch.save(model.state_dict(), 
-                         PATHS.model_dir / MODEL.model_filename)
+                torch.save(model.state_dict(), PATHS.get_model_weights_path(MODEL.model_type))
         else:
             patience_counter += 1
             
@@ -185,7 +223,7 @@ def main():
     plt.legend()
     plt.yscale("log")
     plt.title(f"{MODEL.model_type.capitalize()} Training Losses")
-    plt.savefig(PATHS.model_dir / f"{MODEL.model_type}_training_loss_plot.png")
+    plt.savefig(PATHS.get_loss_plot_path(MODEL.model_type))
 
     print("[INFO] Training completed. Best test loss:", best_val_loss)
     print(f"[INFO] Best model saved as '{MODEL.model_filename}' in 'model/' folder.")

@@ -21,11 +21,11 @@ OUTPUT_FILE = OUTPUT_DIR / "processed_state_vectors.parquet"
 COLUMNS_TO_KEEP = ['icao24', 'time', 'lat', 'lon', 'velocity', 'vertrate', 'heading', 'geoaltitude']
 # Only these numeric columns will be interpolated:
 INTERPOLATE_COLUMNS = ['lat', 'lon', 'velocity', 'vertrate', 'heading', 'geoaltitude']
-# Final processed output columns (dropping 'time'):
-FINAL_COLUMNS = ['icao24', 'lat', 'lon', 'velocity', 'vertrate', 'heading', 'geoaltitude']
+# Final processed output columns (including 'time'):
+FINAL_COLUMNS = ['icao24', 'time', 'lat', 'lon', 'velocity', 'vertrate', 'heading', 'geoaltitude']
 
 # Add this constant near the top with other constants
-TIME_GAP_THRESHOLD_SECONDS = 25 * 60  # 25 minutes in seconds
+TIME_GAP_THRESHOLD_SECONDS = 20 * 60  # 20 minutes in seconds
 
 def load_data(input_dir: Path) -> pl.LazyFrame:
     """
@@ -87,9 +87,11 @@ def process_data(df: pl.LazyFrame) -> pl.LazyFrame:
         # Group by both icao24 and flight_id for interpolation
         .group_by(['icao24', 'flight_id'])
         .agg([
-            pl.col(col).interpolate() for col in INTERPOLATE_COLUMNS
+            # Include time in the aggregation
+            pl.col("time"),  # This will preserve each time value
+            *[pl.col(col).interpolate() for col in INTERPOLATE_COLUMNS]
         ])
-        .explode(INTERPOLATE_COLUMNS)
+        .explode(["time", *INTERPOLATE_COLUMNS])
         .drop_nulls(INTERPOLATE_COLUMNS)
         .select(FINAL_COLUMNS))
 

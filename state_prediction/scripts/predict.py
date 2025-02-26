@@ -15,6 +15,8 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from config import PATHS, DATA, MODEL, TRAIN, INFERENCE
+import argparse
+import json
 
 # Add parent directory to path for model imports
 import sys
@@ -80,9 +82,48 @@ def plot_trajectories(actual_sequences, predicted_sequences, save_path):
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     print("[INFO] Saved multiple flight paths plot to:", save_path)
 
+def parse_args():
+    parser = argparse.ArgumentParser(description='Run predictions with trained model')
+    parser.add_argument('--model', type=str, choices=['transformer', 'lstm', 'ffnn', 'kalman'],
+                       default='transformer', help='Model architecture to use')
+    return parser.parse_args()
+
+def load_config(model_dir, model_type):
+    """Load model configuration from JSON file"""
+    config_path = model_dir / f"{model_type}_config.json"
+    if not config_path.exists():
+        raise FileNotFoundError(f"No config file found at {config_path}")
+    
+    with open(config_path, 'r') as f:
+        config = json.load(f)
+    return config
+
 def main():
+    # Parse command line arguments
+    args = parse_args()
+    
     device = torch.device(TRAIN.device)
     print("[INFO] Using device:", device)
+
+    # Load model configuration for specific model type
+    config = load_config(PATHS.get_model_config_path(args.model))
+    
+    # Verify model type matches
+    if config["model_type"] != args.model:
+        raise ValueError(f"Requested model type '{args.model}' doesn't match saved model type '{config['model_type']}'")
+    
+    # Update MODEL config with saved values
+    MODEL.model_type = config["model_type"]
+    MODEL.input_dim = config["input_dim"]
+    model_specific_config = config[f"{MODEL.model_type}_config"]
+    
+    # Update the specific model configuration
+    if MODEL.model_type == "transformer":
+        MODEL.transformer = TransformerConfig(**model_specific_config)
+    elif MODEL.model_type == "lstm":
+        MODEL.lstm = LSTMConfig(**model_specific_config)
+    elif MODEL.model_type == "ffnn":
+        MODEL.ffnn = FFNNConfig(**model_specific_config)
 
     # 1. Load scalers
     with open(PATHS.scalers_dir / 'X_scaler.pkl', 'rb') as f:
@@ -121,7 +162,10 @@ def main():
         raise ValueError(f"Unknown model type: {MODEL.model_type}")
     
     model = get_model(MODEL.model_type, **model_params).to(device)
-    model.load_state_dict(torch.load(PATHS.model_dir / MODEL.model_filename, map_location=device))
+    model.load_state_dict(torch.load(
+        PATHS.get_model_weights_path(args.model), 
+        map_location=device
+    ))
     model.eval()
 
     criterion = nn.MSELoss()

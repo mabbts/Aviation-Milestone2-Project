@@ -10,3 +10,6 @@ scikit-learn
 missingno
 dask
 statsmodels
+xgboost
+polars
+torch

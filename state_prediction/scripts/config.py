@@ -13,6 +13,18 @@ class PathConfig:
     train_data_dir: Path = BASE_DIR / "state_prediction/model/train_data"
     model_dir: Path = BASE_DIR / "state_prediction/model"
 
+    def get_model_config_path(self, model_type: str) -> Path:
+        """Get path for model-specific configuration file"""
+        return self.model_dir / f"{model_type}_config.json"
+    
+    def get_model_weights_path(self, model_type: str) -> Path:
+        """Get path for model-specific weights file"""
+        return self.model_dir / f"{model_type}_best_model.pth"
+    
+    def get_loss_plot_path(self, model_type: str) -> Path:
+        """Get path for model-specific training loss plot"""
+        return self.model_dir / f"{model_type}_training_loss_plot.png"
+
 @dataclass
 class DataConfig:
     # From prepare_data.py
@@ -74,19 +86,54 @@ class FFNNConfig:
     dropout: float = 0.3
     target_dim: int = 7
 
+# Kalman Filter-specific configuration
+@dataclass
+class KalmanConfig:
+    state_dim: int = None       # If None, will default to 2*input_dim
+    process_noise: float = 1e-4
+    measurement_noise: float = 1e-2
+    dt: float = 3.0             # Time step matching your 3s resampling interval
+    target_dim: int = 7
+
 # General model parameters: common parameters and nested model-specific configurations
 @dataclass
 class ModelConfig:
-    model_type: str = "transformer"  # Options: "transformer", "lstm", or "ffnn"
     input_dim: int = 7  # Common to all models
     transformer: TransformerConfig = TransformerConfig()
     lstm: LSTMConfig = LSTMConfig()
     ffnn: FFNNConfig = FFNNConfig()
+    kalman: KalmanConfig = KalmanConfig()
+    model_type: str = "transformer"  # Default model type
 
     @property
     def model_filename(self) -> str:
         """Dynamically generate model filename based on model type."""
         return f"{self.model_type.lower()}_best_model.pth"
+    
+    def get_model_params(self) -> dict:
+        """Get the parameters for the current model type"""
+        if self.model_type.lower() == "transformer":
+            return {
+                "input_dim": self.input_dim,
+                **vars(self.transformer)
+            }
+        elif self.model_type.lower() == "lstm":
+            return {
+                "input_dim": self.input_dim,
+                **vars(self.lstm)
+            }
+        elif self.model_type.lower() == "ffnn":
+            return {
+                "input_dim": self.input_dim,
+                **vars(self.ffnn)
+            }
+        elif self.model_type.lower() == "kalman":
+            return {
+                "input_dim": self.input_dim,
+                **vars(self.kalman)
+            }
+        else:
+            raise ValueError(f"Unknown model type: {self.model_type}")
 
 @dataclass 
 class TrainingConfig:
@@ -98,7 +145,7 @@ class TrainingConfig:
     device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     # Early stopping parameters
-    patience: int = 10           # Number of epochs to wait for improvement
+    patience: int = 15           # Number of epochs to wait for improvement
     min_delta: float = 1e-4      # Minimum change to qualify as an improvement
     
     # Learning rate scheduling

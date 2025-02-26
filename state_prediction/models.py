@@ -243,6 +243,179 @@ class FFNNPredictor(BasePredictor):
         return self.model(x_flat)
 
 # --------------------------------------------------------------------------------------
+# Kalman Filter Predictor
+# --------------------------------------------------------------------------------------
+class KalmanFilterPredictor(BasePredictor):
+    """
+    Kalman Filter-based sequence predictor.
+    Effective for sequential state estimation with noisy measurements.
+    """
+    def __init__(
+        self,
+        input_dim=7,            # Dimension of the input features
+        state_dim=None,         # Dimension of the state vector (defaults to 2x input_dim for position+velocity)
+        process_noise=1e-4,     # Process noise covariance factor
+        measurement_noise=1e-2, # Measurement noise covariance factor
+        dt=3.0,                 # Time step in seconds (matches your 3s resampling)
+        target_dim=7            # Dimension of output predictions
+    ):
+        """
+        Args:
+            input_dim (int): Number of input features
+            state_dim (int): Dimension of internal state (if None, uses 2*input_dim)
+            process_noise (float): Process noise covariance factor
+            measurement_noise (float): Measurement noise covariance factor
+            dt (float): Time delta between measurements in seconds
+            target_dim (int): Dimension of output predictions
+        """
+        super().__init__()
+        self.input_dim = input_dim
+        self.state_dim = 2 * input_dim if state_dim is None else state_dim
+        self.target_dim = target_dim
+        self.dt = dt
+        
+        # Initialize state transition matrix (F)
+        self.register_buffer("F", self._build_state_transition_matrix(dt))
+        
+        # Initialize measurement matrix (H)
+        self.register_buffer("H", self._build_measurement_matrix())
+        
+        # Initialize process noise covariance (Q)
+        self.register_buffer("Q", self._build_process_noise_matrix(process_noise))
+        
+        # Initialize measurement noise covariance (R)
+        self.register_buffer("R", self._build_measurement_noise_matrix(measurement_noise))
+        
+        # Output projection if needed
+        self.output_projection = nn.Linear(self.state_dim, target_dim)
+    
+    def _build_state_transition_matrix(self, dt):
+        """Build the state transition matrix for the Kalman filter."""
+        # For a simple constant velocity model
+        F = torch.eye(self.state_dim)
+        # Connect position to velocity (x += vx * dt)
+        for i in range(self.input_dim):
+            F[i, i + self.input_dim] = dt
+        return F
+    
+    def _build_measurement_matrix(self):
+        """Build the measurement matrix for the Kalman filter."""
+        # For direct observation of position only
+        H = torch.zeros(self.input_dim, self.state_dim)
+        # Observe the first input_dim elements (positions)
+        for i in range(self.input_dim):
+            H[i, i] = 1.0
+        return H
+    
+    def _build_process_noise_matrix(self, noise_factor):
+        """Build the process noise covariance matrix."""
+        # Simple diagonal process noise
+        return torch.eye(self.state_dim) * noise_factor
+    
+    def _build_measurement_noise_matrix(self, noise_factor):
+        """Build the measurement noise covariance matrix."""
+        # Simple diagonal measurement noise
+        return torch.eye(self.input_dim) * noise_factor
+    
+    def _predict_step(self, state, covariance):
+        """Kalman filter prediction step with vectorized operations."""
+        # For state update: use batch matrix multiplication
+        # First reshape state to (batch_size, 1, state_dim)
+        batch_size = state.shape[0]
+        state_expanded = state.unsqueeze(1)
+        
+        # Properly expand F to match the batch size
+        F_expanded = self.F.unsqueeze(0).expand(batch_size, -1, -1)
+        
+        # Perform batch matrix multiplication
+        new_state = torch.bmm(state_expanded, F_expanded.transpose(1, 2)).squeeze(1)
+        
+        # For covariance: use batch matrix multiplication
+        # F @ covariance @ F.T + Q
+        temp = torch.bmm(F_expanded, covariance)
+        new_covariance = torch.bmm(temp, F_expanded.transpose(1, 2))
+        
+        # Add Q to each item in batch
+        Q_expanded = self.Q.unsqueeze(0).expand(batch_size, -1, -1)
+        new_covariance = new_covariance + Q_expanded
+        
+        return new_state, new_covariance
+        
+    def _update_step(self, state, covariance, measurement):
+        """Kalman filter update step with vectorized operations for batches."""
+        batch_size = state.shape[0]
+        
+        # Expand matrices for batch operations
+        H_expanded = self.H.unsqueeze(0).expand(batch_size, -1, -1)
+        R_expanded = self.R.unsqueeze(0).expand(batch_size, -1, -1)
+        I_expanded = torch.eye(self.state_dim, device=state.device).unsqueeze(0).expand(batch_size, -1, -1)
+        
+        # Calculate innovation: y - H*x
+        innovation = measurement - torch.bmm(H_expanded, state.unsqueeze(2)).squeeze(2)
+        
+        # Calculate innovation covariance: H*P*H' + R
+        temp = torch.bmm(H_expanded, covariance)
+        innovation_covariance = torch.bmm(temp, H_expanded.transpose(1, 2)) + R_expanded
+        
+        # Calculate Kalman gain: P*H'*inv(S)
+        kalman_gain_temp = torch.bmm(covariance, H_expanded.transpose(1, 2))
+        
+        # Handle matrix inverse for each sample in batch
+        kalman_gain = torch.zeros_like(kalman_gain_temp)
+        for i in range(batch_size):
+            kalman_gain[i] = torch.mm(
+                kalman_gain_temp[i], 
+                torch.linalg.inv(innovation_covariance[i])
+            )
+        
+        # Update state: x + K*y
+        state_correction = torch.bmm(kalman_gain, innovation.unsqueeze(2)).squeeze(2)
+        new_state = state + state_correction
+        
+        # Update covariance: (I - K*H)*P
+        temp = torch.bmm(kalman_gain, H_expanded)
+        new_covariance = torch.bmm((I_expanded - temp), covariance)
+        
+        return new_state, new_covariance
+    
+    def forward(self, x):
+        """
+        Forward pass of the Kalman filter predictor.
+        
+        Args:
+            x (Tensor): Input tensor of shape (batch_size, seq_len, input_dim)
+        Returns:
+            Tensor: Predictions of shape (batch_size, target_dim)
+        """
+        batch_size, seq_len, _ = x.shape
+        device = x.device
+        
+        # Initialize state with zeros
+        state = torch.zeros(batch_size, self.state_dim, device=device)
+        # First half is position (from first measurement)
+        state[:, :self.input_dim] = x[:, 0, :]
+        
+        # Initialize covariance with identity for each batch element
+        covariance = torch.eye(self.state_dim, device=device).unsqueeze(0).repeat(batch_size, 1, 1)
+        
+        # Process the sequence
+        for t in range(seq_len):
+            # Prediction step
+            state, covariance = self._predict_step(state, covariance)
+            
+            # Update step (if we have measurements)
+            measurement = x[:, t, :]
+            state, covariance = self._update_step(state, covariance, measurement)
+        
+        # Make one final prediction step to get the next state
+        next_state, _ = self._predict_step(state, covariance)
+        
+        # Project to output dimension if necessary
+        output = self.output_projection(next_state)
+        
+        return output
+
+# --------------------------------------------------------------------------------------
 # Model Factory
 # --------------------------------------------------------------------------------------
 def get_model(model_type="transformer", **kwargs):
@@ -250,7 +423,7 @@ def get_model(model_type="transformer", **kwargs):
     Factory function to instantiate the appropriate model type.
     
     Args:
-        model_type (str): Type of model to create ("transformer", "lstm", or "ffnn")
+        model_type (str): Type of model to create ("transformer", "lstm", "ffnn", or "kalman")
         **kwargs: Model-specific parameters
     
     Returns:
@@ -265,5 +438,7 @@ def get_model(model_type="transformer", **kwargs):
         return LSTMPredictor(**kwargs)
     elif model_type.lower() == "ffnn":
         return FFNNPredictor(**kwargs)
+    elif model_type.lower() == "kalman":
+        return KalmanFilterPredictor(**kwargs)
     else:
         raise ValueError(f"Model type '{model_type}' not recognized.") 
