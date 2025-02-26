@@ -17,8 +17,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 from paths import DATA_DIR
+from config import DataConfig, PATHS, DATA, PathConfig
 
-def resample_flight_state_data(df, interval='5s'):
+def resample_flight_state_data(df, interval=DATA.resample_interval):
     """
     Resample flight state vector data to a specified time interval.
     
@@ -30,7 +31,7 @@ def resample_flight_state_data(df, interval='5s'):
         df (pd.DataFrame): DataFrame containing flight state vector data. Must have a 'time' 
                           column with Unix timestamps.
         interval (str): Pandas time interval string specifying the desired sampling rate.
-                       Default is '5s' for 5 seconds. See pandas documentation for other options.
+                       Default is from config. See pandas documentation for other options.
         
     Returns:
         pd.DataFrame: A new DataFrame with state vectors resampled to the specified interval.
@@ -69,8 +70,8 @@ def resample_flight_state_data(df, interval='5s'):
 
 def create_input_output_sequences(
     df_flight, 
-    input_len=17, 
-    pred_len=1, 
+    input_len=DATA.input_sequence_length, 
+    pred_len=DATA.prediction_length, 
     feature_cols=None, 
     target_cols=None
 ):
@@ -105,7 +106,7 @@ def create_input_output_sequences(
 
 def main():
     # 1. Load raw paths
-    flight_paths = glob.glob(str(DATA_DIR / "raw/accident_flight_states/*"))
+    flight_paths = glob.glob(str(PATHS.raw_data / "*.parquet"))
     print("[INFO] Found {} flight files.".format(len(flight_paths)))
 
     # 2. Resample each flight
@@ -113,8 +114,8 @@ def main():
     for path in flight_paths:
         try:
             df = pd.read_parquet(path)
-            # Resample
-            df_res = resample_flight_state_data(df, interval='3s')
+            # Resample using config interval
+            df_res = resample_flight_state_data(df, interval=DATA.resample_interval)
 
             # Drop columns that are entirely NaN
             df_res = df_res.dropna(axis=1, how='all').sort_values('time')
@@ -122,13 +123,13 @@ def main():
             # set index
             df_res.set_index('time', inplace=True)
 
-            # Interpolate selected columns
-            for col in ['lat','lon','velocity','heading','vertrate','geoaltitude','baroaltitude']:
+            # Interpolate selected columns from config
+            for col in DATA.interpolation_columns:
                 if col in df_res.columns:
                     df_res[col] = df_res[col].interpolate(method='time')
             
-            df_res.dropna(subset=['lat','lon','velocity','heading','vertrate','geoaltitude','baroaltitude'],
-                          inplace=True)
+            # Drop rows with missing values in required columns
+            df_res.dropna(subset=DATA.interpolation_columns, inplace=True)
             
             # reset index
             df_res.reset_index(inplace=True)
@@ -151,12 +152,13 @@ def main():
     # 4. Create sliding windows per flight (group by 'icao24' or appropriate ID)
     all_X = []
     all_y = []
-    feature_cols = ['lon','lat','heading','velocity','vertrate','heading','geoaltitude']
-    target_cols  = ['lon','lat','heading','velocity','vertrate','heading','geoaltitude']
+    # Use feature columns from config
+    feature_cols = DATA.feature_columns
+    target_cols = DATA.target_columns
 
-    # Adjust input_len if desired
-    input_len = 29
-    pred_len  = 1
+    # Use sequence lengths from config
+    input_len = DATA.input_sequence_length
+    pred_len = DATA.prediction_length
 
     for icao24, df_group in combined_df.groupby('icao24'):
         df_group = df_group.sort_values('time').reset_index(drop=True)
@@ -177,10 +179,11 @@ def main():
     print("[INFO] X_final shape:", X_final.shape)
     print("[INFO] y_final shape:", y_final.shape)
 
-    # 5. Split data
+    # 5. Split data using config parameters
     X_train_raw, X_test_raw, y_train_raw, y_test_raw = train_test_split(
-        X_final, y_final, test_size=0.2, shuffle=True, random_state=42
+        X_final, y_final, test_size=DATA.test_size, shuffle=True, random_state=DATA.random_state
     )
+    
     # 6. Scale
     X_scaler = StandardScaler()
     y_scaler = StandardScaler()
@@ -202,18 +205,18 @@ def main():
     y_train = y_train_scaled.reshape(y_train_raw.shape)
     y_test  = y_test_scaled.reshape(y_test_raw.shape)
 
-    # 7. Save data + scalers
-    os.makedirs('state_prediction/model/scalers', exist_ok=True)
-    with open('state_prediction/model/scalers/X_scaler.pkl', 'wb') as f:
+    # 7. Save data + scalers using paths from config
+    os.makedirs(PATHS.scalers_dir, exist_ok=True)
+    with open(PATHS.scalers_dir / 'X_scaler.pkl', 'wb') as f:
         pickle.dump(X_scaler, f)
-    with open('state_prediction/model/scalers/y_scaler.pkl', 'wb') as f:
+    with open(PATHS.scalers_dir / 'y_scaler.pkl', 'wb') as f:
         pickle.dump(y_scaler, f)
 
-    os.makedirs('state_prediction/model/train_data', exist_ok=True)
-    np.save('state_prediction/model/train_data/X_train.npy', X_train)
-    np.save('state_prediction/model/train_data/y_train.npy', y_train)
-    np.save('state_prediction/model/train_data/X_test.npy',  X_test)
-    np.save('state_prediction/model/train_data/y_test.npy',  y_test)
+    os.makedirs(PATHS.train_data_dir, exist_ok=True)
+    np.save(PATHS.train_data_dir / 'X_train.npy', X_train)
+    np.save(PATHS.train_data_dir / 'y_train.npy', y_train)
+    np.save(PATHS.train_data_dir / 'X_test.npy',  X_test)
+    np.save(PATHS.train_data_dir / 'y_test.npy',  y_test)
     print("[INFO] Finished preparing data.")
 
 if __name__ == "__main__":

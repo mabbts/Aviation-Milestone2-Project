@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 import torch
 # Base paths
 BASE_DIR = Path(__file__).parent.parent.parent
-DATA_DIR = BASE_DIR / "data"
+DATA_DIR = BASE_DIR / "julien_data"
 
 @dataclass
 class PathConfig:
@@ -28,9 +28,9 @@ class PathConfig:
 @dataclass
 class DataConfig:
     # From prepare_data.py
-    resample_interval: str = '3s'
-    input_sequence_length: int = 29  # input_len
-    prediction_length: int = 1       # pred_len
+    resample_interval: str = '2s'
+    input_sequence_length: int = 44  # input_len
+    prediction_length: int = 1  # pred_len
     feature_columns: list = field(
         default_factory=lambda: [
             'lon', 'lat', 'heading', 'velocity', 
@@ -56,12 +56,12 @@ class DataConfig:
 @dataclass
 class TransformerConfig:
     d_model: int = 256
-    nhead: int = 8
+    nhead: int = 4
     num_encoder_layers: int = 5
     num_decoder_layers: int = 1
-    dim_feedforward: int = 512
+    dim_feedforward: int = 1024
     dropout: float = 0.2
-    target_dim: int = 7
+    target_dim: int = 6
 
 # LSTM-specific configuration.
 @dataclass
@@ -75,7 +75,7 @@ class LSTMConfig:
     # additional parameters
     bidirectional: bool = False
     # output dimensions
-    target_dim: int = 7
+    target_dim: int = 6
 
 # FFNN-specific configuration
 @dataclass
@@ -84,7 +84,7 @@ class FFNNConfig:
         default_factory=lambda: [512, 256, 128]
     )
     dropout: float = 0.3
-    target_dim: int = 7
+    target_dim: int = 6
 
 # Kalman Filter-specific configuration
 @dataclass
@@ -93,12 +93,12 @@ class KalmanConfig:
     process_noise: float = 1e-4
     measurement_noise: float = 1e-2
     dt: float = 3.0             # Time step matching your 3s resampling interval
-    target_dim: int = 7
+    target_dim: int = 6
 
 # General model parameters: common parameters and nested model-specific configurations
 @dataclass
 class ModelConfig:
-    input_dim: int = 7  # Common to all models
+    input_dim: int = 6  # Common to all models
     transformer: TransformerConfig = TransformerConfig()
     lstm: LSTMConfig = LSTMConfig()
     ffnn: FFNNConfig = FFNNConfig()

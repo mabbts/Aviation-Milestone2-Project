@@ -41,7 +41,7 @@ def load_config(model_path):
         config = json.load(f)
     return config
 
-def resample_flight_state_data(df, interval='3s'):
+def resample_flight_state_data(df, interval='2s'):
     """
     Resample flight state vector data to a specified time interval.
     
@@ -96,7 +96,7 @@ def preprocess_flight_data(df, feature_cols, input_len):
         np.array: Preprocessed sequence data
     """
     # Resample and interpolate
-    df_res = resample_flight_state_data(df, interval='3s')
+    df_res = resample_flight_state_data(df, interval='2s')
     
     # Set index
     df_res.set_index('time', inplace=True)
@@ -191,7 +191,7 @@ def plot_comparison(actual_path, predicted_path, start_point, save_path):
     plt.plot(steps, actual_path[:, 5], 'g-', linewidth=2, label='Actual Altitude')
     plt.plot(pred_steps, predicted_path[:, 5], 'b--', linewidth=2, label='Predicted Altitude')
     
-    plt.xlabel('Time Steps (3s intervals)')
+    plt.xlabel('Time Steps (2s intervals)')
     plt.ylabel('Geoaltitude')
     plt.title('Altitude Profile Comparison')
     plt.grid(True, alpha=0.3)
@@ -278,7 +278,7 @@ def main():
         print(f"[ERROR] Failed to load flight file: {e}")
         sys.exit(1)
     
-    # 2. Define feature columns
+    # 2. Define feature columns (corrected, no duplicate 'heading')
     feature_cols = ['lon', 'lat', 'heading', 'velocity', 'vertrate', 'geoaltitude']
     input_len = 29  # Same as in prepare_data.py
     
