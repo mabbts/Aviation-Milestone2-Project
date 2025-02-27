@@ -20,7 +20,7 @@ from pathlib import Path
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models import get_model
-from config import PATHS, MODEL, TRAIN, INFERENCE
+from config import PATHS, MODEL, TRAIN
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Forecast trajectory for a single flight file')
@@ -254,6 +254,9 @@ def main():
     device = torch.device(TRAIN.device)
     print(f"[INFO] Using device: {device}")
     
+    # Get the model-specific directory
+    model_dir = PATHS.get_model_dir(args.model)
+    
     # Load model configuration
     config = load_config(PATHS.get_model_config_path(args.model))
     
@@ -369,7 +372,7 @@ def main():
         print(f"  {metric}: {value:.6f}")
     
     # Create visualizations directory if it doesn't exist
-    vis_dir = PATHS.model_dir / "visualizations"
+    vis_dir = model_dir / "visualizations"
     os.makedirs(vis_dir, exist_ok=True)
     
     # 13. Plot comparison
@@ -392,7 +395,7 @@ def main():
         "metrics": metrics
     }
     
-    results_path = PATHS.model_dir / f"single_flight_forecast_{args.model}_results.json"
+    results_path = model_dir / f"single_flight_forecast_{args.model}_results.json"
     with open(results_path, 'w') as f:
         json.dump(results, f, indent=4)
     

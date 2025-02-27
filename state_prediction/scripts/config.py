@@ -15,15 +15,15 @@ class PathConfig:
 
     def get_model_config_path(self, model_type: str) -> Path:
         """Get path for model-specific configuration file"""
-        return self.model_dir / f"{model_type}_config.json"
+        return self.model_dir / f"{model_type}/{model_type}_config.json"
     
     def get_model_weights_path(self, model_type: str) -> Path:
         """Get path for model-specific weights file"""
-        return self.model_dir / f"{model_type}_best_model.pth"
+        return self.model_dir / f"{model_type}/{model_type}_best_model.pth"
     
     def get_loss_plot_path(self, model_type: str) -> Path:
         """Get path for model-specific training loss plot"""
-        return self.model_dir / f"{model_type}_training_loss_plot.png"
+        return self.model_dir / f"{model_type}/{model_type}_training_loss_plot.png"
 
 @dataclass
 class DataConfig:

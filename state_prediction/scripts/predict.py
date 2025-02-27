@@ -201,7 +201,7 @@ def main():
             model,
             sample_input,
             y_scaler,
-            num_predictions=200,  # Changed to generate 200 steps
+            num_predictions=300,  # Changed to generate 200 steps
             device=device
         )
         predicted_sequences.append(gen_sequence)
