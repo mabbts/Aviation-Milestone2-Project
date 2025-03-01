@@ -38,74 +38,74 @@ def extract_trajectory_features(df):
         "avg_speed", "avg_altitude", "altitude_range", "alternating_changes"
     ])
 
-# def pca_kmeans_clustering(df, n_clusters=5):
-#     """Applies K-Means clustering to categorize flights."""
-#     feature_df = extract_trajectory_features(df)
-
-#     # Standardize features
-#     scaler = StandardScaler()
-#     X_scaled = scaler.fit_transform(feature_df.iloc[:, 1:])
-
-#     # Apply PCA for dimensionality reduction (optional, but helps with visualization)
-#     pca = PCA(n_components=2)  # Reduce to 2 dimensions for visualization
-#     X_pca = pca.fit_transform(X_scaled)
-
-#     # Plot the PCA components to inspect how well the clusters are separated
-#     plt.scatter(X_pca[:, 0], X_pca[:, 1], c='blue', label="Flight Paths")
-#     plt.title("PCA of Flight Path Features")
-#     plt.xlabel("PCA Component 1")
-#     plt.ylabel("PCA Component 2")
-#     plt.show()
-
-#     # Apply K-Means
-#     kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-#     labels = kmeans.fit_predict(X_scaled)
-
-#     # Assign categories based on new cluster centers
-#     cluster_mapping = create_cluster_mapping(kmeans, scaler, feature_df.columns[1:])
-   
-#     # Visualizing the cluster results with PCA reduced dimensions
-#     plt.scatter(X_pca[:, 0], X_pca[:, 1], c=labels, cmap='viridis')
-#     plt.title(f"Clusters (K={n_clusters})")
-#     plt.xlabel("PCA Component 1")
-#     plt.ylabel("PCA Component 2")
-#     plt.show()
-
-#     return [cluster_mapping[label] for label in labels]
-
-from sklearn.metrics import silhouette_score
-
 def pca_kmeans_clustering(df, n_clusters=5):
-    """Applies K-Means clustering and computes silhouette score."""
+    """Applies K-Means clustering to categorize flights."""
     feature_df = extract_trajectory_features(df)
 
     # Standardize features
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(feature_df.iloc[:, 1:])
 
-    # Apply PCA for visualization (optional)
-    pca = PCA(n_components=2)
+    # Apply PCA for dimensionality reduction (optional, but helps with visualization)
+    pca = PCA(n_components=2)  # Reduce to 2 dimensions for visualization
     X_pca = pca.fit_transform(X_scaled)
+
+    # Plot the PCA components to inspect how well the clusters are separated
+    plt.scatter(X_pca[:, 0], X_pca[:, 1], c='blue', label="Flight Paths")
+    plt.title("PCA of Flight Path Features")
+    plt.xlabel("PCA Component 1")
+    plt.ylabel("PCA Component 2")
+    plt.show()
 
     # Apply K-Means
     kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
     labels = kmeans.fit_predict(X_scaled)
 
-    # Compute silhouette score
-    silhouette_avg = silhouette_score(X_scaled, labels)
-    print(f"Silhouette Score for {n_clusters} clusters: {silhouette_avg:.4f}")
-
-    # Visualizing PCA-reduced clusters
+    # Assign categories based on new cluster centers
+    cluster_mapping = create_cluster_mapping(kmeans, scaler, feature_df.columns[1:])
+   
+    # Visualizing the cluster results with PCA reduced dimensions
     plt.scatter(X_pca[:, 0], X_pca[:, 1], c=labels, cmap='viridis')
-    plt.title(f"Clusters (K={n_clusters}), Silhouette Score: {silhouette_avg:.2f}")
+    plt.title(f"Clusters (K={n_clusters})")
     plt.xlabel("PCA Component 1")
     plt.ylabel("PCA Component 2")
     plt.show()
 
-    # Assign categories based on cluster centers
-    cluster_mapping = create_cluster_mapping(kmeans, scaler, feature_df.columns[1:])
+    return [cluster_mapping[label] for label in labels]
 
-    return [cluster_mapping[label] for label in labels], silhouette_avg
+# from sklearn.metrics import silhouette_score
+
+# def pca_kmeans_clustering(df, n_clusters=5):
+#     """Applies K-Means clustering and computes silhouette score."""
+#     feature_df = extract_trajectory_features(df)
+
+#     # Standardize features
+#     scaler = StandardScaler()
+#     X_scaled = scaler.fit_transform(feature_df.iloc[:, 1:])
+
+#     # Apply PCA for visualization (optional)
+#     pca = PCA(n_components=2)
+#     X_pca = pca.fit_transform(X_scaled)
+
+#     # Apply K-Means
+#     kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+#     labels = kmeans.fit_predict(X_scaled)
+
+#     # Compute silhouette score
+#     silhouette_avg = silhouette_score(X_scaled, labels)
+#     print(f"Silhouette Score for {n_clusters} clusters: {silhouette_avg:.4f}")
+
+#     # Visualizing PCA-reduced clusters
+#     plt.scatter(X_pca[:, 0], X_pca[:, 1], c=labels, cmap='viridis')
+#     plt.title(f"Clusters (K={n_clusters}), Silhouette Score: {silhouette_avg:.2f}")
+#     plt.xlabel("PCA Component 1")
+#     plt.ylabel("PCA Component 2")
+#     plt.show()
+
+#     # Assign categories based on cluster centers
+#     cluster_mapping = create_cluster_mapping(kmeans, scaler, feature_df.columns[1:])
+
+#     return [cluster_mapping[label] for label in labels], silhouette_avg
 
 def create_cluster_mapping(kmeans, scaler, feature_names):
     """Refines cluster labeling based on updated feature understanding."""
