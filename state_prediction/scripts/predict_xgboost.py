@@ -32,10 +32,13 @@ def load_xgboost_models(target='all'):
     """
     models = {}
     
+    # Define the XGBoost models directory
+    xgboost_dir = PATHS.model_dir / 'xgboost'
+    
     if target == 'all':
         # Load all target models
         for target_name in DATA.target_columns:
-            model_path = PATHS.model_dir / f'xgboost_{target_name}_model.bin'
+            model_path = xgboost_dir / f'{target_name}_model.bin'
             if model_path.exists():
                 model = xgb.Booster()  
                 model.load_model(str(model_path))
@@ -44,20 +47,20 @@ def load_xgboost_models(target='all'):
                 print(f"[WARNING] Model for {target_name} not found at {model_path}")
         
         # Also load feature list
-        feature_path = PATHS.model_dir / f'xgboost_{DATA.target_columns[0]}_features.json'
+        feature_path = xgboost_dir / f'{DATA.target_columns[0]}_features.json'
         with open(feature_path, 'r') as f:
             feature_list = json.load(f)
         
         return models, feature_list
     else:
         # Load specific target model
-        model_path = PATHS.model_dir / f'xgboost_{target}_model.bin'
+        model_path = xgboost_dir / f'{target}_model.bin'
         if model_path.exists():
             model = xgb.Booster()
             model.load_model(str(model_path))
             
             # Load feature list
-            feature_path = PATHS.model_dir / f'xgboost_{target}_features.json'
+            feature_path = xgboost_dir / f'{target}_features.json'
             with open(feature_path, 'r') as f:
                 feature_list = json.load(f)
                 

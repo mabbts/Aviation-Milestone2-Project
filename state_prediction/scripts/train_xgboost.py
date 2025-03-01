@@ -18,8 +18,9 @@ import argparse
 from pathlib import Path
 
 import xgboost as xgb
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.model_selection import train_test_split
+import shap
 
 # Add parent directory to path
 import sys
@@ -177,6 +178,7 @@ def evaluate_model(model, X_df, y_true, target_idx=None, target_name=None):
         y_actual = y_true[:, target_idx]
         mse = mean_squared_error(y_actual, y_pred)
         rmse = np.sqrt(mse)
+        mae = mean_absolute_error(y_actual, y_pred)
         
         # Make some basic plots
         plt.figure(figsize=(10, 6))
@@ -185,9 +187,15 @@ def evaluate_model(model, X_df, y_true, target_idx=None, target_name=None):
         plt.xlabel(f'True {target_name}')
         plt.ylabel(f'Predicted {target_name}')
         plt.title(f'XGBoost Prediction for {target_name} (RMSE={rmse:.4f})')
-        plt.savefig(PATHS.model_dir / f'xgboost_{target_name}_prediction.png')
+        plt.savefig(PATHS.model_dir / 'xgboost' / f'{target_name}_prediction.png')
         
-        return {'mse': mse, 'rmse': rmse}
+        # SHAP analysis
+        perform_shap_analysis(model, X_df, target_name)
+        
+        # Analyze worst predictions
+        analyze_worst_predictions(X_df, y_actual, y_pred, model, target_name)
+        
+        return {'mse': mse, 'rmse': rmse, 'mae': mae}
     else:
         # Multi-target evaluation
         metrics = {}
@@ -195,19 +203,129 @@ def evaluate_model(model, X_df, y_true, target_idx=None, target_name=None):
             mse = mean_squared_error(y_true[:, i], y_pred[:, i])
             metrics[f'{name}_mse'] = mse
             metrics[f'{name}_rmse'] = np.sqrt(mse)
+            metrics[f'{name}_mae'] = mean_absolute_error(y_true[:, i], y_pred[:, i])
         return metrics
+
+def perform_shap_analysis(model, X_df, target_name):
+    """
+    Perform SHAP analysis on the model to understand feature importance.
+    
+    Args:
+        model: Trained XGBoost model
+        X_df: DataFrame with features
+        target_name: Name of the target variable
+    """
+    print(f"[INFO] Performing SHAP analysis for {target_name}...")
+    
+    # Create SHAP explainer
+    explainer = shap.TreeExplainer(model)
+    
+    # Calculate SHAP values
+    shap_values = explainer.shap_values(X_df)
+    
+    # Create and save summary plot
+    plt.figure(figsize=(12, 10))
+    shap.summary_plot(shap_values, X_df, show=False)
+    plt.title(f'SHAP Summary for {target_name}')
+    plt.tight_layout()
+    plt.savefig(PATHS.model_dir / 'xgboost' / f'{target_name}_shap_summary.png')
+    plt.close()
+    
+    # Create and save feature importance plot based on SHAP
+    plt.figure(figsize=(12, 10))
+    shap.summary_plot(shap_values, X_df, plot_type="bar", show=False)
+    plt.title(f'SHAP Feature Importance for {target_name}')
+    plt.tight_layout()
+    plt.savefig(PATHS.model_dir / 'xgboost' / f'{target_name}_shap_importance.png')
+    plt.close()
+    
+    print(f"[INFO] SHAP analysis completed for {target_name}")
+
+def analyze_worst_predictions(X_df, y_true, y_pred, model, target_name):
+    """
+    Analyze the worst predictions to understand failure modes.
+    
+    Args:
+        X_df: DataFrame with features
+        y_true: True target values
+        y_pred: Predicted target values
+        model: Trained XGBoost model
+        target_name: Name of the target variable
+    """
+    print(f"[INFO] Analyzing worst predictions for {target_name}...")
+    
+    # Calculate absolute errors
+    errors = np.abs(y_true - y_pred)
+    
+    # Get indices of worst predictions (top 20)
+    worst_indices = np.argsort(errors)[-20:]
+    
+    # Create SHAP explainer
+    explainer = shap.TreeExplainer(model)
+    
+    # Create a directory for failure analysis
+    failure_dir = PATHS.model_dir / 'xgboost' / 'failure_analysis' / target_name
+    failure_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Save summary of worst predictions
+    worst_predictions = pd.DataFrame({
+        'True_Value': y_true[worst_indices],
+        'Predicted_Value': y_pred[worst_indices],
+        'Absolute_Error': errors[worst_indices]
+    })
+    worst_predictions.to_csv(failure_dir / 'worst_predictions.csv', index=False)
+    
+    # Analyze each of the worst predictions
+    for i, idx in enumerate(worst_indices):
+        # Get SHAP values for this instance
+        shap_values = explainer.shap_values(X_df.iloc[idx:idx+1])
+        
+        # Create force plot for this instance
+        plt.figure(figsize=(14, 6))
+        shap.force_plot(
+            explainer.expected_value, 
+            shap_values[0], 
+            X_df.iloc[idx], 
+            matplotlib=True,
+            show=False
+        )
+        plt.title(f'SHAP Force Plot for Prediction {i+1}\n'
+                 f'True: {y_true[idx]:.4f}, Predicted: {y_pred[idx]:.4f}, Error: {errors[idx]:.4f}')
+        plt.tight_layout()
+        plt.savefig(failure_dir / f'failure_{i+1}_force_plot.png')
+        plt.close()
+        
+        # Create waterfall plot for this instance
+        plt.figure(figsize=(14, 10))
+        shap.waterfall_plot(
+            shap.Explanation(
+                values=shap_values[0],
+                base_values=explainer.expected_value,
+                data=X_df.iloc[idx].values,
+                feature_names=X_df.columns
+            ),
+            show=False
+        )
+        plt.title(f'SHAP Waterfall Plot for Prediction {i+1}\n'
+                 f'True: {y_true[idx]:.4f}, Predicted: {y_pred[idx]:.4f}, Error: {errors[idx]:.4f}')
+        plt.tight_layout()
+        plt.savefig(failure_dir / f'failure_{i+1}_waterfall_plot.png')
+        plt.close()
+    
+    print(f"[INFO] Failure analysis completed for {target_name}")
 
 def save_model_and_features(model, feature_list, target_name='all'):
     """Save the model and feature list"""
-    # Create model directory if it doesn't exist
-    PATHS.model_dir.mkdir(parents=True, exist_ok=True)
+    # Create XGBoost model directory if it doesn't exist
+    xgboost_dir = PATHS.model_dir / 'xgboost'
+    xgboost_dir.mkdir(parents=True, exist_ok=True)
     
     # Save model
-    model_path = PATHS.model_dir / f'xgboost_{target_name}_model.bin'
+    model_path = xgboost_dir / f'{target_name}_model.bin'
     model.save_model(str(model_path))
     
     # Save feature list
-    with open(PATHS.model_dir / f'xgboost_{target_name}_features.json', 'w') as f:
+    with open(xgboost_dir / f'{target_name}_features.json', 'w') as f:
         json.dump(feature_list, f)
     
     print(f"[INFO] Saved XGBoost model and features for '{target_name}' target")
@@ -219,6 +337,10 @@ def main():
 
     # Create model directory if it doesn't exist
     PATHS.model_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Create XGBoost subdirectory
+    xgboost_dir = PATHS.model_dir / 'xgboost'
+    xgboost_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. Load data
     print("[INFO] Loading sequence data...")
@@ -265,7 +387,7 @@ def main():
             xgb.plot_importance(model, max_num_features=20, height=0.8)
             plt.title(f'XGBoost Feature Importance ({target_name})')
             plt.tight_layout()
-            plt.savefig(PATHS.model_dir / f'xgboost_{target_name}_feature_importance.png')
+            plt.savefig(xgboost_dir / f'{target_name}_feature_importance.png')
         
         print("[INFO] Test metrics for all targets:", metrics)
     else:
@@ -286,7 +408,7 @@ def main():
         xgb.plot_importance(model, max_num_features=20, height=0.8)
         plt.title(f'XGBoost Feature Importance ({target_var})')
         plt.tight_layout()
-        plt.savefig(PATHS.model_dir / f'xgboost_{target_var}_feature_importance.png')
+        plt.savefig(xgboost_dir / f'{target_var}_feature_importance.png')
     
     print("[INFO] Training completed")
 
