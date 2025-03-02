@@ -67,7 +67,8 @@ class TransformerPredictor(BasePredictor):
         num_decoder_layers=1, 
         dim_feedforward=1024, 
         dropout=0.3, 
-        target_dim=7
+        target_dim=7,
+        teacher_forcing_ratio=0.5  # New parameter for teacher forcing
     ):
         """
         Args:
@@ -79,9 +80,16 @@ class TransformerPredictor(BasePredictor):
             dim_feedforward (int): Dimension of feedforward network
             dropout (float): Dropout rate
             target_dim (int): Dimension of output predictions
+            teacher_forcing_ratio (float): Probability of using teacher forcing during training
         """
         super().__init__()
+        self.input_dim = input_dim
+        self.d_model = d_model
+        self.target_dim = target_dim
+        self.teacher_forcing_ratio = teacher_forcing_ratio
+        
         self.input_proj = nn.Linear(input_dim, d_model)
+        self.target_proj = nn.Linear(target_dim, d_model)  # New projection for target inputs
         self.pos_encoder = PositionalEncoding(d_model, dropout=dropout)
         
         # Encoder
@@ -108,12 +116,15 @@ class TransformerPredictor(BasePredictor):
         self.fc_out = nn.Linear(d_model, target_dim)
         self.target_embedding = nn.Parameter(torch.randn(1, 1, d_model))
 
-    def forward(self, x):
+    def forward(self, x, target=None, use_teacher_forcing=None):
         """
         Forward pass of the transformer predictor.
         
         Args:
             x (Tensor): Input tensor of shape (batch_size, seq_len, input_dim)
+            target (Tensor, optional): Target tensor for teacher forcing of shape (batch_size, target_dim)
+            use_teacher_forcing (bool, optional): Whether to use teacher forcing. If None, uses self.teacher_forcing_ratio
+            
         Returns:
             Tensor: Predictions of shape (batch_size, target_dim)
         """
@@ -121,7 +132,19 @@ class TransformerPredictor(BasePredictor):
         x = self.input_proj(x)
         x = self.pos_encoder(x)
         memory = self.transformer_encoder(x)
-        decoder_input = self.target_embedding.expand(batch_size, -1, -1)
+        
+        # Determine whether to use teacher forcing
+        if use_teacher_forcing is None:
+            use_teacher_forcing = target is not None and torch.rand(1).item() < self.teacher_forcing_ratio
+        
+        if use_teacher_forcing and target is not None:
+            # Use the target as input to the decoder (teacher forcing)
+            decoder_input = self.target_proj(target).unsqueeze(1)  # Shape: (batch_size, 1, d_model)
+            decoder_input = self.pos_encoder(decoder_input)  # Add positional encoding
+        else:
+            # Use the learnable target embedding
+            decoder_input = self.target_embedding.expand(batch_size, -1, -1)
+        
         decoded = self.transformer_decoder(decoder_input, memory)
         out = self.fc_out(decoded.squeeze(1))
         return out

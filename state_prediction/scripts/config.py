@@ -55,7 +55,7 @@ class DataConfig:
 # Transformer-specific configuration.
 @dataclass
 class TransformerConfig:
-    d_model: int = 256
+    d_model: int = 512
     nhead: int = 4
     num_encoder_layers: int = 5
     num_decoder_layers: int = 1

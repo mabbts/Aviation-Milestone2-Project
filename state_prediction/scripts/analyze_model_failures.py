@@ -153,155 +153,181 @@ def get_predictions(model, X_test, model_type, device=None, target_idx=None):
             return predictions
 
 def analyze_failures_nn(model, X_test, y_test, model_type, target_name, target_idx, 
-                      num_failures=20, error_threshold=None, background_samples=100):
-    """
-    Analyze failures for neural network models using SHAP.
+                       num_failures=20, error_threshold=None, background_samples=100):
+    """Analyze failures for neural network models"""
+    # Create directory for failure analysis
+    failure_dir = PATHS.model_dir / model_type / 'failure_analysis' / target_name
+    failure_dir.mkdir(parents=True, exist_ok=True)
     
-    Args:
-        model: Trained neural network model
-        X_test: Test input data
-        y_test: Test target data
-        model_type: Type of model ('transformer', 'lstm', 'ffnn')
-        target_name: Name of the target variable
-        target_idx: Index of the target variable
-        num_failures: Number of worst predictions to analyze
-        error_threshold: Analyze predictions with errors above this threshold
-        background_samples: Number of background samples for SHAP
-    """
-    device = next(model.parameters()).device
+    # Set device
+    device = torch.device('cpu')  # Use CPU for SHAP analysis
+    model = model.to(device)
     
-    # Get predictions
+    # Convert to PyTorch tensors
+    X_tensor = torch.tensor(X_test, dtype=torch.float32)
+    y_tensor = torch.tensor(y_test.squeeze(1), dtype=torch.float32)
+    
+    # Get predictions in batches to avoid OOM errors
+    batch_size = 64  # Adjust this based on your memory
+    predictions = []
+    
+    model.eval()
     with torch.no_grad():
-        X_tensor = torch.tensor(X_test, dtype=torch.float32).to(device)
-        predictions = model(X_tensor).cpu().numpy()
+        for i in range(0, len(X_tensor), batch_size):
+            batch_X = X_tensor[i:i+batch_size].to(device)
+            batch_pred = model(batch_X).cpu().numpy()
+            predictions.append(batch_pred)
     
-    # Get actual values for the target
-    y_actual = y_test.squeeze(1)[:, target_idx]
+    # Combine batch predictions
+    predictions = np.vstack(predictions)
+    
+    # Get target predictions and actual values
     y_pred = predictions[:, target_idx]
+    y_true = y_test.squeeze(1)[:, target_idx]
     
     # Calculate errors
-    errors = np.abs(y_actual - y_pred)
+    errors = np.abs(y_true - y_pred)
     
     # Get indices of failures
     if error_threshold is not None:
         failure_indices = np.where(errors > error_threshold)[0]
         if len(failure_indices) == 0:
             print(f"[WARNING] No predictions found with errors above {error_threshold}")
-            failure_indices = np.argsort(errors)[-num_failures:]
-        elif len(failure_indices) > num_failures:
-            # If too many failures above threshold, take the worst ones
-            sorted_indices = failure_indices[np.argsort(errors[failure_indices])[::-1]]
-            failure_indices = sorted_indices[:num_failures]
+            return
     else:
-        # Get the worst num_failures predictions
+        # Get top N worst predictions
         failure_indices = np.argsort(errors)[-num_failures:]
     
-    # Create directory for failure analysis
-    failure_dir = PATHS.model_dir / model_type / 'failure_analysis' / target_name
-    failure_dir.mkdir(parents=True, exist_ok=True)
+    print(f"[INFO] Analyzing {len(failure_indices)} failures")
     
-    # Save summary of worst predictions
-    worst_predictions = pd.DataFrame({
-        'True_Value': y_actual[failure_indices],
+    # Create a DataFrame with failures
+    failure_df = pd.DataFrame({
+        'Index': failure_indices,
+        'True_Value': y_true[failure_indices],
         'Predicted_Value': y_pred[failure_indices],
         'Absolute_Error': errors[failure_indices]
     })
-    worst_predictions.to_csv(failure_dir / 'worst_predictions.csv', index=False)
+    failure_df.to_csv(failure_dir / 'worst_predictions.csv', index=False)
     
-    # Create SHAP explainer
-    # Select a subset of background samples for efficiency
-    background_indices = np.random.choice(len(X_test), min(background_samples, len(X_test)), replace=False)
-    background = torch.tensor(X_test[background_indices], dtype=torch.float32).to(device)
-    
-    # Create a wrapper function for the model that returns only the target dimension
-    def model_wrapper(x):
-        with torch.no_grad():
-            return model(x)[:, target_idx:target_idx+1]
-    
-    # Create SHAP explainer based on model type
-    if model_type in ['transformer', 'lstm']:
-        explainer = shap.DeepExplainer(model_wrapper, background)
-    else:  # FFNN
-        explainer = shap.GradientExplainer(model_wrapper, background)
-    
-    # Calculate SHAP values for failure cases
-    failure_samples = torch.tensor(X_test[failure_indices], dtype=torch.float32).to(device)
-    shap_values = explainer.shap_values(failure_samples)
-    
-    # If shap_values is a list (multiple outputs), take the first element
-    if isinstance(shap_values, list):
-        shap_values = shap_values[0]
-    
-    # Create feature names for visualization
-    feature_names = []
-    for t in range(X_test.shape[1]):  # For each time step
-        for f in DATA.feature_columns:  # For each feature
-            feature_names.append(f"{f}_t-{X_test.shape[1]-t}")
-    
-    # Analyze each failure
-    for i, idx in enumerate(range(len(failure_indices))):
-        # Create waterfall plot for this instance
-        plt.figure(figsize=(14, 10))
+    # For PyTorch models, use GradientExplainer instead of DeepExplainer
+    try:
+        # Select a smaller subset for background
+        background_indices = np.random.choice(len(X_test), min(background_samples, 50), replace=False)
+        background = X_tensor[background_indices].to(device)
         
-        # Reshape SHAP values to match feature names
-        flat_shap_values = shap_values[idx].reshape(-1)
-        flat_features = X_test[failure_indices[idx]].reshape(-1)
+        # Create a PyTorch-compatible explainer
+        explainer = shap.GradientExplainer(model, background)
         
-        # Take top 20 features by absolute SHAP value
-        top_indices = np.argsort(np.abs(flat_shap_values))[-20:]
+        # Compute SHAP values for failures in batches
+        all_shap_values = []
+        batch_size = 10  # Smaller batch size for SHAP computation
         
-        # Create a bar plot of SHAP values
-        plt.barh(
-            [feature_names[j] for j in top_indices],
-            flat_shap_values[top_indices],
-            color=['red' if x > 0 else 'blue' for x in flat_shap_values[top_indices]]
-        )
-        plt.title(f'Top Features for Prediction {i+1}\n'
-                 f'True: {y_actual[failure_indices[idx]]:.4f}, '
-                 f'Predicted: {y_pred[failure_indices[idx]]:.4f}, '
-                 f'Error: {errors[failure_indices[idx]]:.4f}')
-        plt.tight_layout()
-        plt.savefig(failure_dir / f'failure_{i+1}_top_features.png')
-        plt.close()
-    
-    # Calculate average absolute SHAP value for each feature
-    feature_contributions = pd.DataFrame(
-        np.abs(shap_values.reshape(len(failure_indices), -1)),
-        columns=feature_names
-    )
-    
-    # Calculate average contribution per feature
-    avg_contributions = feature_contributions.mean().sort_values(ascending=False)
-    
-    # Plot average feature contributions to errors
-    plt.figure(figsize=(12, 8))
-    avg_contributions.head(20).plot(kind='bar')
-    plt.title(f'Average Feature Contributions to Errors for {target_name}')
-    plt.ylabel('Average |SHAP Value|')
-    plt.tight_layout()
-    plt.savefig(failure_dir / 'average_feature_contributions.png')
-    plt.close()
-    
-    # Save feature contributions to CSV
-    avg_contributions.to_csv(failure_dir / 'average_feature_contributions.csv')
-    
-    # Create summary plot for all failures
-    plt.figure(figsize=(12, 10))
-    shap.summary_plot(
-        shap_values.reshape(len(failure_indices), -1),
-        X_test[failure_indices].reshape(len(failure_indices), -1),
-        feature_names=feature_names,
-        show=False
-    )
-    plt.title(f'SHAP Summary for {target_name} Failures')
-    plt.tight_layout()
-    plt.savefig(failure_dir / 'shap_summary.png')
-    plt.close()
-    
-    print(f"[INFO] Analyzed {len(failure_indices)} failures for {target_name}")
-    print(f"[INFO] Top 5 features contributing to errors:")
-    for feature, value in avg_contributions.head(5).items():
-        print(f"  - {feature}: {value:.6f}")
+        for i in range(0, len(failure_indices), batch_size):
+            batch_indices = failure_indices[i:i+batch_size]
+            batch_X = X_tensor[batch_indices].to(device)
+            batch_shap = explainer.shap_values(batch_X)
+            
+            # For PyTorch models, shap_values might be a list of arrays or have unexpected shape
+            if isinstance(batch_shap, list):
+                # If it's a list, take the appropriate target index if possible
+                if len(batch_shap) > target_idx:
+                    batch_shap = batch_shap[target_idx]
+                else:
+                    batch_shap = batch_shap[0]  # Default to first output
+            
+            # Handle the case where SHAP returns shape (batch, seq_len, features, output_dim)
+            if len(batch_shap.shape) == 4 and batch_shap.shape[3] == len(DATA.target_columns):
+                # Extract the values for the specific target
+                batch_shap = batch_shap[:, :, :, target_idx]
+            
+            # Ensure the batch_shap has the right shape
+            expected_shape = batch_X.shape
+            if batch_shap.shape != expected_shape:
+                # Try to reshape if total elements match
+                if np.prod(batch_shap.shape) == np.prod(expected_shape):
+                    batch_shap = batch_shap.reshape(expected_shape)
+                else:
+                    print(f"[WARNING] Unexpected SHAP values shape: {batch_shap.shape}, expected: {expected_shape}")
+                    # Skip this batch if shapes don't match
+                    continue
+            
+            all_shap_values.append(batch_shap)
+        
+        # Combine all SHAP values
+        if len(all_shap_values) > 0:
+            shap_values = np.vstack(all_shap_values)
+            
+            # Create feature names for visualization
+            feature_names = []
+            for t in range(X_test.shape[1]):  # For each time step
+                for f in range(X_test.shape[2]):  # For each feature
+                    feature_name = f"{DATA.feature_columns[f]}_{t}"
+                    feature_names.append(feature_name)
+            
+            # Create summary plot
+            plt.figure(figsize=(12, 10))
+            shap.summary_plot(
+                shap_values.reshape(shap_values.shape[0], -1),
+                X_test[failure_indices].reshape(len(failure_indices), -1),
+                feature_names=feature_names,
+                show=False
+            )
+            plt.title(f'SHAP Summary Plot for {target_name} Failures')
+            plt.tight_layout()
+            plt.savefig(failure_dir / 'shap_summary_plot.png')
+            plt.close()
+            
+            # Analyze top contributing features
+            shap_abs = np.abs(shap_values.reshape(shap_values.shape[0], -1))
+            shap_mean = np.mean(shap_abs, axis=0)
+            
+            # Create DataFrame with feature importance
+            feature_importance = pd.DataFrame({
+                'Feature': feature_names,
+                'Importance': shap_mean
+            })
+            feature_importance = feature_importance.sort_values('Importance', ascending=False)
+            feature_importance.to_csv(failure_dir / 'feature_importance.csv', index=False)
+            
+            # Plot top 20 features
+            plt.figure(figsize=(12, 8))
+            plt.barh(feature_importance['Feature'][:20][::-1], feature_importance['Importance'][:20][::-1])
+            plt.title(f'Top 20 Features Contributing to {target_name} Prediction Errors')
+            plt.tight_layout()
+            plt.savefig(failure_dir / 'top_features.png')
+            plt.close()
+            
+            print(f"[INFO] Top 5 features contributing to errors:")
+            for feature, value in feature_importance.head(5).iterrows():
+                print(f"  - {value['Feature']}: {value['Importance']:.6f}")
+        
+    except Exception as e:
+        print(f"[WARNING] SHAP analysis failed: {str(e)}")
+        print("[INFO] Falling back to simpler analysis method")
+        
+        # Fallback: Analyze input patterns for failures
+        X_failures = X_test[failure_indices]
+        
+        # Calculate mean and std of each feature at each time step
+        mean_features = np.mean(X_failures, axis=0)
+        std_features = np.std(X_failures, axis=0)
+        
+        # Plot feature patterns for failures
+        for f_idx, feature_name in enumerate(DATA.feature_columns):
+            plt.figure(figsize=(10, 6))
+            plt.plot(mean_features[:, f_idx], label='Mean')
+            plt.fill_between(
+                range(len(mean_features)),
+                mean_features[:, f_idx] - std_features[:, f_idx],
+                mean_features[:, f_idx] + std_features[:, f_idx],
+                alpha=0.3
+            )
+            plt.title(f'Pattern of {feature_name} in Failed Predictions')
+            plt.xlabel('Time Step')
+            plt.ylabel(feature_name)
+            plt.legend()
+            plt.savefig(failure_dir / f'{feature_name}_pattern.png')
+            plt.close()
 
 def analyze_failures_xgb(model, X_test, y_test, target_name, target_idx, 
                        num_failures=20, error_threshold=None):

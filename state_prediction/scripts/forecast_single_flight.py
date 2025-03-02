@@ -255,7 +255,7 @@ def main():
     print(f"[INFO] Using device: {device}")
     
     # Get the model-specific directory
-    model_dir = PATHS.get_model_dir(args.model)
+    model_dir = PATHS.model_dir / args.model
     
     # Load model configuration
     config = load_config(PATHS.get_model_config_path(args.model))

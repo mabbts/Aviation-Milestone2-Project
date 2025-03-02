@@ -66,7 +66,7 @@ def main():
     }
     
     # Get the model-specific directory
-    model_dir = PATHS.get_model_dir(MODEL.model_type)
+    model_dir = PATHS.model_dir / MODEL.model_type
     
     # Create model directory if it doesn't exist
     model_dir.mkdir(parents=True, exist_ok=True)
@@ -174,8 +174,16 @@ def main():
         total_train_loss = 0
         for Xb, yb in train_loader:
             optimizer.zero_grad()
-            preds = model(Xb)
-            loss  = criterion(preds, yb)
+            
+            # Use teacher forcing during training if using transformer
+            if MODEL.model_type.lower() == "transformer":
+                # For the first epoch, always use teacher forcing to help initial learning
+                use_teacher_forcing = epoch == 0 or None  # None will use the model's default ratio
+                preds = model(Xb, target=yb, use_teacher_forcing=use_teacher_forcing)
+            else:
+                preds = model(Xb)
+            
+            loss = criterion(preds, yb)
             loss.backward()
             # Gradient clipping to prevent exploding gradients
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
@@ -188,8 +196,12 @@ def main():
         total_test_loss = 0
         with torch.no_grad():
             for Xb, yb in test_loader:
-                preds = model(Xb)
-                loss  = criterion(preds, yb)
+                # During validation, never use teacher forcing
+                if MODEL.model_type.lower() == "transformer":
+                    preds = model(Xb, use_teacher_forcing=False)
+                else:
+                    preds = model(Xb)
+                loss = criterion(preds, yb)
                 total_test_loss += loss.item()
         avg_test_loss = total_test_loss / len(test_loader)
 
@@ -208,7 +220,8 @@ def main():
             patience_counter = 0
             # Save best model
             if TRAIN.save_model:
-                torch.save(model.state_dict(), PATHS.get_model_weights_path(MODEL.model_type))
+                model_weights_path = model_dir / f"{MODEL.model_type}_best_model.pth"
+                torch.save(model.state_dict(), model_weights_path)
         else:
             patience_counter += 1
             
