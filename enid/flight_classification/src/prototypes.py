@@ -111,12 +111,18 @@ def normalize_path(path, num_points=100, weights=None):
 
 
 
-# Function to calculate DTW distance
+# Function to calculate DTW distance with a dynamic warping window constraint
 def calculate_dtw_distance(path1, path2, window=5):
-    """Computes DTW distance with a warping constraint."""
-    return dtw_ndim.distance(np.array(path1), np.array(path2), window=window)
+    """Computes DTW distance with a dynamic warping window constraint."""
+    len_path1 = len(path1)
+    len_path2 = len(path2)
 
+    # If lengths differ significantly, increase the window size for more flexibility
+    if abs(len_path1 - len_path2) > 5:
+        window = max(window, int(abs(len_path1 - len_path2) / 2))
 
+    return dtw_ndim.distance(path1, path2, window=window)
+                        
 
 def classify_flight_path(path, speed_weight=2.0, altitude_weight=2.0):
     """Classifies a flight path using weighted DTW.""" 
@@ -147,30 +153,50 @@ def classify_flight_path(path, speed_weight=2.0, altitude_weight=2.0):
 
 
 import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
+
 def plot_prototypes():
     # Define the prototypes
     prototypes = {
         'Commercial Flight': commercial_prototype(),
         'Training Flight': training_prototype(),
-        'Surveillance Flight': surveillance_prototype(),
-        'Emergency Flight': emergency_prototype(),
+        'Surveillance Flight': surveillance_prototype(),        
+        'Private Flight': private_prototype(),
     }
+    
+     # Determine the number of prototypes
+    n_prototypes = len(prototypes)
 
-    # Create the plot
-    plt.figure(figsize=(10, 8))
+    # Define the grid layout (e.g., 2 rows, 3 columns)
+    fig, axes = plt.subplots(2, 3, figsize=(15, 10))
     
-    # Plot each prototype path
-    for label, path in prototypes.items():
+    # Flatten the axes array for easier iteration
+    axes = axes.flatten()
+
+    # Plot each prototype path on a different subplot
+    for i, (label, path) in enumerate(prototypes.items()):
         lats, lons = zip(*[(lat, lon) for lat, lon, _, _ in path])  # Unpack only lat, lon
-        plt.plot(lons, lats, label=label, marker='o', markersize=5)
-    
-        # Customize the plot
-        plt.title('Flight Prototypes')
-        plt.xlabel('Longitude')
-        plt.ylabel('Latitude')
-        plt.legend()
-        plt.grid(True)
-        plt.show()
+        
+        # Plot on the corresponding subplot
+        ax = axes[i]
+        ax.plot(lons, lats, label=label, marker='o', markersize=5)
+        
+        # Customize the subplot
+        ax.set_title(label)
+        ax.set_xlabel('Longitude')
+        ax.set_ylabel('Latitude')
+        ax.legend()
+        ax.grid(True)
+
+     # Hide any empty subplots
+    for j in range(n_prototypes, len(axes)):
+        axes[j].axis('off')
+
+
+    # Adjust layout to prevent overlap and show the plot
+    plt.tight_layout()
+    plt.show()
+
 
 
 def test_prototypes():
