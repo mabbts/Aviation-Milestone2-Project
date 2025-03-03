@@ -150,7 +150,7 @@ def generate_sequence(model, initial_sequence, y_scaler, num_predictions, device
     predictions_unscaled = y_scaler.inverse_transform(predictions)
     return predictions_unscaled
 
-def plot_comparison(actual_path, predicted_path, start_point, save_path):
+def plot_comparison(actual_path, predicted_path, start_point, save_path, model_type='Model', flight_id='Unknown'):
     """
     Plot actual vs predicted flight path.
     
@@ -159,47 +159,139 @@ def plot_comparison(actual_path, predicted_path, start_point, save_path):
         predicted_path: Predicted flight path coordinates
         start_point: Starting point for prediction
         save_path: Path to save the plot
+        model_type: Type of model used for prediction
+        flight_id: Identifier for the flight
     """
-    plt.figure(figsize=(12, 10))
+    # Set global font properties
+    plt.rcParams.update({
+        'font.family': 'sans-serif',
+        'font.size': 12,
+        'axes.titlesize': 16,
+        'axes.labelsize': 14,
+        'xtick.labelsize': 12,
+        'ytick.labelsize': 12,
+        'legend.fontsize': 12
+    })
+    
+    # Create trajectory plot
+    fig, ax = plt.subplots(figsize=(14, 12), dpi=150)
     
     # Plot actual trajectory
-    plt.plot(actual_path[:, 0], actual_path[:, 1], 'g-', linewidth=2, label='Actual Path')
+    ax.plot(actual_path[:, 0], actual_path[:, 1], 'g-', linewidth=2.5, label='Actual Path')
     
     # Plot predicted trajectory
     full_pred = np.vstack([start_point, predicted_path])
-    plt.plot(full_pred[:, 0], full_pred[:, 1], 'b--', linewidth=2, label='Predicted Path')
+    ax.plot(full_pred[:, 0], full_pred[:, 1], 'b--', linewidth=2.5, label='Predicted Path')
     
     # Mark start and end points
-    plt.plot(start_point[0, 0], start_point[0, 1], 'go', markersize=10, label='Start Point')
-    plt.plot(actual_path[-1, 0], actual_path[-1, 1], 'ro', markersize=8, label='Actual End')
-    plt.plot(predicted_path[-1, 0], predicted_path[-1, 1], 'bo', markersize=8, label='Predicted End')
+    ax.plot(start_point[0, 0], start_point[0, 1], 'go', markersize=12, label='Forecast Start Point')
+    ax.plot(actual_path[-1, 0], actual_path[-1, 1], 'ro', markersize=10, label='Actual End')
+    ax.plot(predicted_path[-1, 0], predicted_path[-1, 1], 'bo', markersize=10, label='Predicted End')
     
-    plt.xlabel('Longitude')
-    plt.ylabel('Latitude')
-    plt.title('Flight Trajectory Forecast Comparison')
-    plt.grid(True, alpha=0.3)
-    plt.legend()
+    # Calculate error distance
+    final_error_km = haversine(
+        actual_path[-1, 1], actual_path[-1, 0], 
+        predicted_path[-1, 1], predicted_path[-1, 0]
+    )
     
-    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    ax.set_xlabel('Longitude', fontweight='bold')
+    ax.set_ylabel('Latitude', fontweight='bold')
+    ax.set_title(f'Flight Trajectory Forecast ({model_type.upper()})\nFlight ID: {flight_id}\nFinal Position Error: {final_error_km:.2f} km', 
+                 fontweight='bold', pad=15)
+    
+    # Improve grid appearance
+    ax.grid(True, linestyle='--', alpha=0.6)
+    
+    # Add legend with better placement
+    ax.legend(loc='best', framealpha=0.9, fancybox=True, shadow=True)
+    
+    # Add timestamp
+    plt.figtext(0.02, 0.02, f'Generated: {pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")}', 
+                fontsize=10, style='italic')
+    
+    plt.tight_layout()
+    plt.savefig(save_path, bbox_inches='tight')
     print(f"[INFO] Saved comparison plot to: {save_path}")
     
-    # Also create a figure showing altitude over time
-    plt.figure(figsize=(12, 6))
+    # Create altitude plot
+    fig, ax = plt.subplots(figsize=(14, 8), dpi=150)
     steps = np.arange(len(actual_path))
     pred_steps = np.arange(len(predicted_path)) + len(actual_path) // 2
     
-    plt.plot(steps, actual_path[:, 5], 'g-', linewidth=2, label='Actual Altitude')
-    plt.plot(pred_steps, predicted_path[:, 5], 'b--', linewidth=2, label='Predicted Altitude')
+    # Plot altitude profiles
+    ax.plot(steps, actual_path[:, 5], 'g-', linewidth=2.5, label='Actual Altitude')
+    ax.plot(pred_steps, predicted_path[:, 5], 'b--', linewidth=2.5, label='Predicted Altitude')
     
-    plt.xlabel('Time Steps (2s intervals)')
-    plt.ylabel('Geoaltitude')
-    plt.title('Altitude Profile Comparison')
-    plt.grid(True, alpha=0.3)
-    plt.legend()
+    # Calculate altitude error
+    alt_error = np.abs(actual_path[-1, 5] - predicted_path[-1, 5])
     
+    ax.set_xlabel('Time Steps (2s intervals)', fontweight='bold')
+    ax.set_ylabel('Geoaltitude (meters)', fontweight='bold')
+    ax.set_title(f'Altitude Profile Comparison ({model_type.upper()})\nFlight ID: {flight_id}\nFinal Altitude Error: {alt_error:.2f} m', 
+                fontweight='bold', pad=15)
+    
+    # Add shaded region for prediction part
+    ax.axvspan(pred_steps[0], pred_steps[-1], color='lightskyblue', alpha=0.2, label='Prediction Region')
+    
+    # Improve grid appearance
+    ax.grid(True, linestyle='--', alpha=0.6)
+    
+    # Add legend with better placement
+    ax.legend(loc='best', framealpha=0.9, fancybox=True, shadow=True)
+    
+    plt.tight_layout()
     altitude_plot_path = save_path.parent / f"{save_path.stem}_altitude{save_path.suffix}"
-    plt.savefig(altitude_plot_path, dpi=300, bbox_inches='tight')
+    plt.savefig(altitude_plot_path, bbox_inches='tight')
     print(f"[INFO] Saved altitude plot to: {altitude_plot_path}")
+    
+    # Create velocity plot
+    fig, ax = plt.subplots(figsize=(14, 8), dpi=150)
+    ax.plot(steps, actual_path[:, 3], 'g-', linewidth=2.5, label='Actual Velocity')
+    ax.plot(pred_steps, predicted_path[:, 3], 'b--', linewidth=2.5, label='Predicted Velocity')
+    
+    # Calculate velocity error
+    vel_error = np.abs(actual_path[-1, 3] - predicted_path[-1, 3])
+    
+    ax.set_xlabel('Time Steps (2s intervals)', fontweight='bold')
+    ax.set_ylabel('Velocity (m/s)', fontweight='bold')
+    ax.set_title(f'Velocity Profile Comparison ({model_type.upper()})\nFlight ID: {flight_id}\nFinal Velocity Error: {vel_error:.2f} m/s', 
+                fontweight='bold', pad=15)
+    
+    # Add shaded region for prediction part
+    ax.axvspan(pred_steps[0], pred_steps[-1], color='lightskyblue', alpha=0.2, label='Prediction Region')
+    
+    # Improve grid appearance
+    ax.grid(True, linestyle='--', alpha=0.6)
+    
+    # Add legend with better placement
+    ax.legend(loc='best', framealpha=0.9, fancybox=True, shadow=True)
+    
+    plt.tight_layout()
+    velocity_plot_path = save_path.parent / f"{save_path.stem}_velocity{save_path.suffix}"
+    plt.savefig(velocity_plot_path, bbox_inches='tight')
+    print(f"[INFO] Saved velocity plot to: {velocity_plot_path}")
+
+def haversine(lat1, lon1, lat2, lon2):
+    """
+    Calculate the haversine distance between two points on earth.
+    
+    Args:
+        lat1, lon1: Latitude and longitude of first point in degrees
+        lat2, lon2: Latitude and longitude of second point in degrees
+        
+    Returns:
+        Distance in kilometers
+    """
+    # Convert latitude and longitude from degrees to radians
+    lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
+    
+    # Haversine formula
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
+    c = 2 * np.arcsin(np.sqrt(a))
+    r = 6371  # Radius of earth in kilometers
+    return c * r
 
 def calculate_metrics(actual, predicted):
     """
@@ -375,6 +467,9 @@ def main():
     vis_dir = model_dir / "visualizations"
     os.makedirs(vis_dir, exist_ok=True)
     
+    # Extract flight ID from filename for visualization
+    flight_id = flight_path.stem
+    
     # 13. Plot comparison
     print("[INFO] Plotting comparison...")
     last_input_point = input_sequence[-1:].reshape(1, -1)
@@ -382,7 +477,9 @@ def main():
         actual_path,
         predictions,
         last_input_point,
-        vis_dir / f"single_flight_forecast_{args.model}.png"
+        vis_dir / f"single_flight_forecast_{args.model}.png",
+        model_type=args.model,
+        flight_id=flight_id
     )
     
     # 14. Save the results

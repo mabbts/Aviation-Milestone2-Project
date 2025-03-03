@@ -7,7 +7,7 @@ DATA_DIR = BASE_DIR / "julien_data"
 
 @dataclass
 class PathConfig:
-    raw_data: Path = DATA_DIR / "raw/accident_flight_states"
+    raw_data: Path = DATA_DIR / "raw/flight_states"
     processed_data: Path = DATA_DIR / "processed"
     scalers_dir: Path = BASE_DIR / "state_prediction/model/scalers"
     train_data_dir: Path = BASE_DIR / "state_prediction/model/train_data"
@@ -29,7 +29,7 @@ class PathConfig:
 class DataConfig:
     # From prepare_data.py
     resample_interval: str = '2s'
-    input_sequence_length: int = 44  # input_len
+    input_sequence_length: int = 99  # input_len
     prediction_length: int = 1  # pred_len
     feature_columns: list = field(
         default_factory=lambda: [

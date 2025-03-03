@@ -1,18 +1,19 @@
-# Milestone II: Big Data Project (SIADS 696)
 
-Welcome to the **Milestone II** repository for the SIADS 696 course at the University of Michigan. This project explores **Supervised Learning** and **Unsupervised Learning** techniques on aviation data from the **OpenSky Network** using a pipeline-oriented approach.
+# Flight Data Analysis and Prediction System
+
+This project is a comprehensive system for retrieving, processing, analyzing, and predicting aircraft flight data from the **OpenSky Network**. It consists of three main components:
+
+1. **Data Pipeline (`src/`)**: A robust pipeline for retrieving and processing flight data
+2. **State Prediction (`state_prediction/`)**: Advanced machine learning models for predicting future aircraft states
+3. **Flight Classification (`enid/`)**: Unsupervised learning techniques for classifying flight patterns
 
 ## Table of Contents
 - [Project Overview](#project-overview)
-- [Objectives](#objectives)
-- [Directory Structure](#directory-structure)
 - [Key Components](#key-components)
-  - [Pipelines](#pipelines)
-  - [Queries](#queries)
-  - [Retrieval](#retrieval)
-  - [Transformations](#transformations)
-  - [Utilities](#utilities)
-- [Scripts](#scripts)
+  - [Data Pipeline (src)](#data-pipeline-src)
+  - [State Prediction](#state-prediction)
+  - [Flight Classification (ENID)](#flight-classification-enid)
+- [Directory Structure](#directory-structure)
 - [Example Usage](#example-usage)
 - [Current Progress](#current-progress)
 - [Next Steps](#next-steps)
@@ -24,30 +25,60 @@ Welcome to the **Milestone II** repository for the SIADS 696 course at the Unive
 
 This repository leverages the **OpenSky Network** ADS-B data to:
 
-- Ingest and store flight-related data (flights, state vectors).
-- Preprocess raw flight tracks for later analysis or modeling.
-- Provide an end-to-end pipeline for data retrieval, transformation, and storage.
+- Ingest and store flight-related data (flights, state vectors)
+- Preprocess raw flight tracks for analysis and modeling
+- Predict future aircraft states using various machine learning approaches
+- Classify flight patterns using unsupervised learning techniques
 
 We aim to build scalable data pipelines and conduct robust analyses that can uncover patterns, support supervised/unsupervised learning, and demonstrate best practices in big data handling.
 
 ---
 
-## Objectives
+## Key Components
 
-1. **Data Retrieval & Storage**  
-   Query data from the OpenSky Trino database in time-chunked or sampled intervals, storing results locally (Parquet/CSV).
+### Data Pipeline (src)
 
-2. **Data Preprocessing**  
-   Clean, transform, and compute aggregate metrics on flight tracks for downstream modeling and analysis.
+The data pipeline provides a structured framework for retrieving and processing flight data from the OpenSky Network.
 
-3. **Scalability**  
-   Ensure solutions can handle large volumes of data efficiently by leveraging chunked retrieval and batch processing.
+#### Key Features:
+- **Retrieval Engine**: Fetches flight data using time intervals and query functions
+- **Pipeline Modules**: Specialized pipelines for different data types:
+  - `FlightsPipeline`: Retrieves flight data with metadata
+  - `StateVectorPipeline`: Retrieves state vector data (position, velocity, etc.)
+- **Query Modules**: SQL query generators for different data types
+- **Transformation Modules**: Data preprocessing utilities
 
-4. **Analysis & Modeling**  
-   Lay groundwork for exploratory analysis, predictive modeling (supervised), and anomaly/clustering tasks (unsupervised).
+### State Prediction
 
-5. **Reproducibility**  
-   Provide clear scripts and modular code so the entire process (from data retrieval to transformation) can be easily replicated.
+The state prediction component uses machine learning to predict future aircraft states based on historical trajectory data.
+
+#### Models Implemented:
+1. **Transformer**: Attention-based sequence model for capturing complex temporal dependencies
+2. **LSTM**: Long Short-Term Memory network for sequential data
+3. **FFNN**: Feed-Forward Neural Network for simpler prediction tasks
+4. **XGBoost**: Gradient boosting for tabular data with engineered features
+5. **Kalman Filter**: Traditional state estimation approach
+
+#### Key Features:
+- Model training and evaluation scripts
+- Hyperparameter optimization
+- Comprehensive metrics and visualization tools
+- Prediction capabilities for single flights or batches
+- Analysis tools for model performance and failure cases
+
+### Flight Classification (ENID)
+
+The flight classification component uses unsupervised learning techniques to identify and categorize flight patterns.
+
+#### Key Techniques:
+1. **Dynamic Time Warping (DTW)**: Algorithm for measuring similarity between temporal sequences
+2. **K-means Clustering**: Unsupervised clustering to identify natural groupings of flight patterns
+3. **Prototype Matching**: Comparison of flight patterns against predefined prototypes
+
+#### Features:
+- Support for multi-dimensional DTW to compare multiple flight attributes
+- Prototype-based classification for known flight categories
+- CNN-based classification after unsupervised labeling
 
 ---
 
@@ -57,173 +88,119 @@ Below is a high-level overview of the repository layout:
 
 ```
 .
-├── setup.py
-├── scripts/
-│   ├── get_flight_data.py
-│   ├── get_state_vector_data.py
-│   ├── sample_flights.py
-│   ├── sample_state_vectors.py
-│   ├── preprocess_flights.py
-│   └── __init__.py
-├── src/
-│   ├── pipeline/
-│   │   ├── flight_pipeline.py
-│   │   └── state_vector_pipeline.py
-│   ├── queries/
-│   │   ├── flight_queries.py
-│   │   └── state_vector_queries.py
-│   ├── retrieval/
-│   │   ├── retrieval_engine.py
-│   │   └── interval_generation.py
-│   ├── transformations/
-│   │   └── flight_preprocessing.py
-│   └── utils/
-│       ├── constants.py
-│       ├── file_utils.py
-│       ├── paths.py
-│       ├── time_utils.py
-│       ├── utils.py
-│       └── __init__.py
-├── data/
-│   ├── raw/
-│   │   ├── v4_chunks/
-│   │   ├── v4_samples/
-│   │   └── state_vectors_chunks/
-│   └── processed/
-└── README.md
+├── src/                           # Data pipeline code
+│   ├── pipeline/                  # Data retrieval pipelines
+│   │   ├── flight_pipeline.py     # Flight data pipeline
+│   │   └── state_vector_pipeline.py # State vector pipeline
+│   ├── queries/                   # SQL query generators
+│   │   ├── flight_queries.py      # Flight data queries
+│   │   └── state_vector_queries.py # State vector queries
+│   ├── retrieval/                 # Data retrieval utilities
+│   │   ├── interval_generation.py # Time interval generators
+│   │   └── retrieval_engine.py    # Generic retrieval engine
+│   ├── transformations/           # Data transformation utilities
+│   │   ├── flight_preprocessing.py # Flight data preprocessing
+│   │   └── state_preprocessing.py # State vector preprocessing
+│   └── utils/                     # Utility functions
+│       ├── constants.py           # Constant definitions
+│       ├── file_utils.py          # File handling utilities
+│       ├── paths.py               # Path definitions
+│       └── time_utils.py          # Time handling utilities
+│
+├── state_prediction/              # State prediction models
+│   ├── models.py                  # Model definitions
+│   └── scripts/                   # Training and evaluation scripts
+│       ├── analyze_model_failures.py # Failure analysis
+│       ├── config.py              # Configuration
+│       ├── evaluate.py            # Model evaluation
+│       ├── feature_analysis.py    # Feature importance analysis
+│       ├── forecast_single_flight.py # Single flight prediction
+│       ├── paths.py               # Path definitions
+│       ├── predict.py             # Prediction script
+│       ├── prepare_data.py        # Data preparation
+│       ├── sensitivity_analysis.py # Hyperparameter sensitivity
+│       ├── train.py               # Model training
+│       ├── train_xgboost.py       # XGBoost training
+│       └── visualize_flights.py   # Visualization utilities
+│
+├── enid/                          # Flight classification
+│   └── flight_classification/     # Classification utilities
+│       └── cnn_experimentation2.ipynb # Prototype matching and CNN
+│
+├── data/                          # Data storage (not in repo)
+│   ├── raw/                       # Raw data from OpenSky
+│   └── processed/                 # Processed data for modeling
+│
+├── setup.py                       # Setup script
+└── README.md                      # This file
 ```
-
-- **scripts**: Python entry-point scripts for retrieving or processing data.
-- **src**:  
-  - **pipeline**: High-level workflow pipelines (e.g., retrieving chunked or sampled flights, state vectors).  
-  - **queries**: SQL query builders for OpenSky's Trino database.  
-  - **retrieval**: Core retrieval engine and interval generation (chunked or random sampling).  
-  - **transformations**: Data transformation and preprocessing logic (e.g., computing flight track metrics).  
-  - **utils**: Shared utilities (paths, file handling, constants, date/time parsing, etc.).
-
-- **data**: Suggested folder structure for storing **raw** downloaded Parquet files and any **processed** or **analyzed** output.
-
----
-
-## Key Components
-
-### Pipelines
-
-- **`flight_pipeline.py`**  
-  Contains methods to retrieve flight data (v4) from the OpenSky database in either:
-  1. **Chunked** intervals (`chunked_flight_v4`)
-  2. **Random sampled** intervals (`sample_flight_v4`)
-
-- **`state_vector_pipeline.py`**  
-  Defines methods to retrieve state vector data:
-  1. **Chunked** intervals (`chunked_state_vectors`)
-  2. **Random sampled** intervals (`sample_state_vectors`)
-
-These pipelines rely on **interval generation** (e.g., `generate_chunk_intervals`, `generate_sample_intervals`) and the **retrieval engine** to execute queries and save results.
-
-### Queries
-
-- **`flight_queries.py`**  
-  Provides SQL query templates (`get_flight_data_v4`, `get_flight_data_v5`) to fetch flight data from different OpenSky datasets.
-
-- **`state_vector_queries.py`**  
-  Offers SQL to retrieve state vector data with optional geographic bounding (e.g., `GEORGIA_BOUNDS`).
-
-### Retrieval
-
-- **`retrieval_engine.py`**  
-  Houses the `retrieve_data_by_intervals` function:
-  - Executes SQL queries against OpenSky (via `pyopensky.trino.Trino`)
-  - Saves output to Parquet using utility functions.
-
-- **`interval_generation.py`**  
-  - **`generate_chunk_intervals`**: Slices a time range into consecutive (e.g., hourly) intervals.  
-  - **`generate_sample_intervals`**: Creates random intervals of a specified length between a start/end date.
-
-### Transformations
-
-- **`flight_preprocessing.py`**  
-  - **`compute_track_metrics`**: Given a flight track, computes min/max/mean of latitude, longitude, altitude, heading, and on-ground percentage.  
-  - **`preprocess_flight_data`**: Applies `compute_track_metrics` to a DataFrame's `track` column, returns new columns (e.g., `time_min`, `time_max`, etc.).
-
-### Utilities
-
-- **`constants.py`**: Contains bounds for Georgia, airport mappings, and other shared constants.  
-- **`time_utils.py`, `utils.py`**: Date/time parsing, random sampling of dates, and general helper functions.  
-- **`file_utils.py`**: Logic for saving data safely to CSV/Parquet (skipping if file exists, etc.).  
-- **`paths.py`**: Defines project directories (e.g., `DATA_DIR`) and ensures they exist.
-
----
-
-## Scripts
-
-1. **`get_flight_data.py`**  
-   - Demonstrates how to invoke `FlightsPipeline.chunked_flight_v4` to pull flight data in hourly chunks.
-
-2. **`sample_flights.py`**  
-   - Shows usage of `FlightsPipeline.sample_flight_v4` to randomly sample intervals within a given date range.
-
-3. **`get_state_vector_data.py`**  
-   - Illustrates `StateVectorPipeline.chunked_state_vectors` to fetch state vector data in consecutive time slices.
-
-4. **`sample_state_vectors.py`**  
-   - Uses `StateVectorPipeline.sample_state_vectors` to retrieve random daily intervals of state vector data.
-
-5. **`preprocess_flights.py`**  
-   - Reads multiple Parquet files from a folder, concatenates them, applies `preprocess_flight_data`, and saves the result.
-
-Each script can be run directly (e.g., `python scripts/get_flight_data.py`) once dependencies are installed and the environment is set up.
 
 ---
 
 ## Example Usage
 
-1. **Run the setup script** to create the virtual environment and install dependencies:
-   ```bash
-   python setup.py
-   ```
-   This will:
-   - Create the necessary data directories (`data/raw` and `data/processed`)
-   - Set up a virtual environment in `.venv`
-   - Install all required dependencies from `requirements.txt`
+### Data Pipeline
 
-2. **Configure** your environment with credentials/permissions to query the OpenSky Trino endpoint.
+```python
+from src.pipeline.flight_pipeline import FlightsPipeline
+from src.utils.paths import DATA_DIR
 
-3. **Retrieve chunked flights**:
-   ```bash
-   python scripts/get_flight_data.py
-   ```
-   - This will generate hourly Parquet files in `data/raw/v4_chunks`.
+# Retrieve flight data in 1-hour chunks
+FlightsPipeline.chunked_flight_v4(
+    start_date="2023-01-01",
+    end_date="2023-01-02",
+    output_dir=DATA_DIR / "flights",
+    chunk_hours=1.0
+)
+```
 
-4. **Sample flight data**:
-   ```bash
-   python scripts/sample_flights.py
-   ```
-   - Creates random 1-hour intervals over a given date range, saving results in `data/raw/v4_samples`.
+### State Prediction
 
-5. **Preprocess flights**:
-   ```bash
-   python scripts/preprocess_flights.py
-   ```
-   - Reads the downloaded Parquet files in `data/raw/v4_samples`, applies transformations, and saves them in `data/processed`.
+```bash
+# Train a transformer model
+python state_prediction/scripts/train.py --model transformer
+
+# Evaluate model performance
+python state_prediction/scripts/evaluate.py --model transformer --k_folds 5
+
+# Generate predictions for a flight
+python state_prediction/scripts/forecast_single_flight.py --model transformer --flight_file path/to/flight.parquet
+```
+
+### Flight Classification
+
+The flight classification component is primarily implemented in Jupyter notebooks for exploratory analysis and visualization. The main notebook is `enid/flight_classification/cnn_experimentation2.ipynb`.
 
 ---
 
 ## Current Progress
 
-- **Chunked & Sampled Retrieval**: Implemented and tested for both flight data (v4) and state vector data, saving directly to Parquet.
-- **Basic Preprocessing**: Functions to compute track metrics (min/max/mean alt/lon/lat, on-ground fraction, etc.) have been added.
-- **Scripts**: Example scripts illustrating how to retrieve and preprocess data are operational.
-- **Organized Codebase**: A modular structure (`pipeline`, `queries`, `retrieval`, `transformations`, `utils`, `scripts`) for clarity and scalability.
+- **Data Pipeline**: Fully implemented and tested for both flight data and state vector data
+- **State Prediction**: 
+  - Implemented multiple model architectures (Transformer, LSTM, XGBoost)
+  - Created comprehensive evaluation framework
+  - Analyzed model performance and failure cases
+- **Flight Classification**:
+  - Implemented DTW-based similarity measurement
+  - Created K-means clustering for flight pattern identification
+  - Developed prototype matching for classification
+  - Explored CNN-based classification after unsupervised labeling
 
 ---
 
 ## Next Steps
 
-- **Enhanced Preprocessing**: Improve the flight preprocessor to handle edge cases (e.g., incomplete tracks, merges).
-- **Exploratory Data Analysis**: Generate visual summaries (flight density maps, altitude distributions, etc.).
-- **Model Prototypes**: Implement initial supervised/unsupervised models (e.g., cluster flight patterns, predict flight delays).
-- **Automation**: Integrate scheduling tools (e.g., Airflow or Cron) for routine data pulls.
+- **Data Pipeline**:
+  - Support for additional data sources
+  - Real-time data streaming capabilities
+- **State Prediction**:
+  - Multi-modal prediction incorporating weather data
+  - Uncertainty quantification in predictions
+  - Ensemble methods combining multiple model types
+- **Flight Classification**:
+  - Integration of supervised learning with domain expert labels
+  - Anomaly detection for unusual flight patterns
+  - Real-time classification capabilities
 
 ---
 
@@ -231,7 +208,6 @@ Each script can be run directly (e.g., `python scripts/get_flight_data.py`) once
 
 This project is part of a course requirement, but feedback, suggestions, and ideas are welcome! Feel free to open issues or submit pull requests if you have improvements to suggest.
 
-- **Issues**: For bug reports or feature requests.
-- **Pull Requests**: We welcome code contributions—please be sure to include clear descriptions and testing steps.
+- **Issues**: For bug reports or feature requests
+- **Pull Requests**: We welcome code contributions—please be sure to include clear descriptions and testing steps
 
-Thank you for checking out the **SIADS 696 Big Data Project**. We hope our approach to modular, scalable data pipelines inspires your own data engineering and analytics projects!
