@@ -1,3 +1,6 @@
+# About This Fork
+
+This project was completed as part of a team milestone in the University of Michigan's Master of Applied Data Science program. My contributions include data acquisition, validating and contributing to various code elements, report writing, and subject matter expertise regarding the ADBS sytem.
 
 # Flight Data Analysis and Prediction System
 
