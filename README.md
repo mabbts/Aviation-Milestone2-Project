@@ -136,6 +136,7 @@ Below is a high-level overview of the repository layout:
 │
 ├── setup.py                       # Setup script
 └── README.md                      # This file
+└── Milestone II – Project Report (1).docx # Final report for the project (view as raw)
 ```
 
 ---
